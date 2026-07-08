@@ -13,7 +13,6 @@ import { Map } from 'lucide-react-native';
 import { supabase } from '@/utils/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
 import MaskedView from "@react-native-masked-view/masked-view";
 import Reanimated, {
   useSharedValue,
@@ -34,157 +33,54 @@ const FONTS = [
 ];
 const DEFAULT_COLORS = ['#FFFFFF', '#00FA9A', '#0A1BFF', '#FFD700', '#FF6347'];
 
-// ─── Animated water-wave edge overlay ───────────────────────────────────────
-
-// ─── Portal Atmosphere ───────────────────────────────────────────────
-
-
-
-
 function WaveEdge({ side }) {
-
   const scale = useSharedValue(1);
 
-
   useEffect(() => {
-
     scale.value = withRepeat(
-      withTiming(1.15, {
-        duration: 7000,
-      }),
+      withTiming(1.15, { duration: 7000 }),
       -1,
       true
     );
-
   }, []);
 
-
-
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: scale.value }
-    ]
+    transform: [{ scale: scale.value }]
   }));
 
-
-
   const config = {
-
     top: {
-      style: {
-        top: -80,
-        left: -50,
-        right: -50,
-        height: 180,
-      },
-      colors: [
-        "rgba(0,0,0,1)",
-        "rgba(0,0,0,0.9)",
-        "transparent"
-      ],
-      start: { x: 0, y: 0 },
-      end: { x: 0, y: 1 }
+      style: { top: -80, left: -50, right: -50, height: 180 },
+      colors: ["rgba(0,0,0,1)", "rgba(0,0,0,0.9)", "transparent"],
+      start: { x: 0, y: 0 }, end: { x: 0, y: 1 }
     },
-
-
     bottom: {
-      style: {
-        bottom: -80,
-        left: -50,
-        right: -50,
-        height: 180,
-      },
-      colors: [
-        "transparent",
-        "rgba(0,0,0,0.9)",
-        "rgba(0,0,0,1)"
-      ],
-      start: { x: 0, y: 0 },
-      end: { x: 0, y: 1 }
+      style: { bottom: -80, left: -50, right: -50, height: 180 },
+      colors: ["transparent", "rgba(0,0,0,0.9)", "rgba(0,0,0,1)"],
+      start: { x: 0, y: 0 }, end: { x: 0, y: 1 }
     },
-
-
     left: {
-      style: {
-        left: -80,
-        top: -50,
-        bottom: -50,
-        width: 180,
-      },
-      colors: [
-        "rgba(0,0,0,1)",
-        "rgba(0,0,0,0.9)",
-        "transparent"
-      ],
-      start: { x: 0, y: 0 },
-      end: { x: 1, y: 0 }
+      style: { left: -80, top: -50, bottom: -50, width: 180 },
+      colors: ["rgba(0,0,0,1)", "rgba(0,0,0,0.9)", "transparent"],
+      start: { x: 0, y: 0 }, end: { x: 1, y: 0 }
     },
-
-
     right: {
-      style: {
-        right: -80,
-        top: -50,
-        bottom: -50,
-        width: 180,
-      },
-      colors: [
-        "transparent",
-        "rgba(0,0,0,0.9)",
-        "rgba(0,0,0,1)"
-      ],
-      start: { x: 0, y: 0 },
-      end: { x: 1, y: 0 }
+      style: { right: -80, top: -50, bottom: -50, width: 180 },
+      colors: ["transparent", "rgba(0,0,0,0.9)", "rgba(0,0,0,1)"],
+      start: { x: 0, y: 0 }, end: { x: 1, y: 0 }
     }
-
   }[side];
 
-
-
   return (
-
-    <Reanimated.View
-      style={[
-        {
-          position: "absolute",
-          zIndex: 20,
-        },
-        config.style,
-        animatedStyle
-      ]}
-    >
-
-      <MaskedView
-
-        style={StyleSheet.absoluteFill}
-
-        maskElement={
-
-          <LinearGradient
-            colors={config.colors}
-            start={config.start}
-            end={config.end}
-            style={StyleSheet.absoluteFill}
-          />
-
-        }
-
-      >
-
-        <BlurView
-          intensity={100}
-          tint="dark"
-          style={StyleSheet.absoluteFill}
-        />
-
-
+    <Reanimated.View style={[{ position: "absolute", zIndex: 20 }, config.style, animatedStyle]}>
+      <MaskedView style={StyleSheet.absoluteFill} maskElement={
+        <LinearGradient colors={config.colors} start={config.start} end={config.end} style={StyleSheet.absoluteFill} />
+      }>
+        <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
       </MaskedView>
-
     </Reanimated.View>
-
   );
 }
-// ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function Home() {
   const insets = useSafeAreaInsets();
@@ -230,8 +126,12 @@ export default function Home() {
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  const aiMessage = useMemo(() => {
-    if (!dream && reviews.length === 0) return "Open the Review tab, describe your dream, and write your first weekly log — the portal will begin to see.";
+  // 1. Gather all unique text quotes into an array
+  const allMessages = useMemo(() => {
+    if (!dream && reviews.length === 0) {
+      return ["Open the Review tab, describe your dream, and write your first weekly log — the portal will begin to see."];
+    }
+    
     const msgs = [];
     if (dream) {
       msgs.push(`Your dream is to "${dream}". Every action today is building that reality.`);
@@ -247,23 +147,48 @@ export default function Home() {
     msgs.push("Your future self is crafted by today's training — not tomorrow's intentions.");
     msgs.push("The mirror shows who you are choosing to become. Keep choosing wisely.");
     msgs.push("Every week you log is a step the portal can see further into your future.");
-    return msgs[Math.abs((dream?.length || 0) + reviews.length * 17) % msgs.length];
+    return msgs;
   }, [dream, reviews]);
 
-  // Cycle background images every 8s
-  const imgOpacity = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (userImages.length < 2) return;
-    const id = setInterval(() => {
-      Animated.timing(imgOpacity, { toValue: 0, duration: 700, useNativeDriver: true }).start(() => {
-        setCurImgIdx(p => (p + 1) % userImages.length);
-        Animated.timing(imgOpacity, { toValue: 1, duration: 900, useNativeDriver: true }).start();
-      });
-    }, 8000);
-    return () => clearInterval(id);
-  }, [userImages.length]);
+  // Fade animations for text & images syncing together
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const swipeLock = useRef(false);
 
+  const changeSlide = useCallback((dir) => {
+    if (swipeLock.current) return;
+    swipeLock.current = true;
+
+    // Fade out both text and image together
+    Animated.timing(contentOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+      setCurImgIdx(p => {
+        // Find the maximum limit based on images or quotes to prevent stale states
+        const maxLimit = userImages.length > 0 ? userImages.length : allMessages.length;
+        return (p + dir + maxLimit) % maxLimit;
+      });
+
+      // Fade back in with the new contents loaded
+      Animated.timing(contentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start(() => {
+        swipeLock.current = false;
+      });
+    });
+  }, [userImages.length, allMessages.length]);
+
+  const swipeResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (e, gs) => Math.abs(gs.dy) > 10,
+    // Evaluate gesture ONLY when the drag finishes to avoid multi-firing
+    onPanResponderRelease: (e, gs) => {
+      if (gs.dy < -60) {
+        changeSlide(1); // Swiped UP (Scroll down)
+      } else if (gs.dy > 60) {
+        changeSlide(-1); // Swiped DOWN (Scroll up)
+      }
+    },
+  })).current;
+
+  // Deriving active image and active text safely based on current index counter
   const activeImageUrl = userImages.length > 0 ? userImages[curImgIdx % userImages.length]?.url : null;
+  const currentQuote = allMessages[curImgIdx % allMessages.length] || '';
   const fontObj = FONTS.find(f => f.id === settings.quoteFont) || FONTS[0];
 
   const panResponder = useRef(PanResponder.create({
@@ -273,14 +198,14 @@ export default function Home() {
   })).current;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#020206' }}>
+    <View style={{ flex: 1, backgroundColor: '#020206' }} {...swipeResponder.panHandlers}>
       <StatusBar style="light" />
 
       {/* Full-screen background: image or deep space */}
       {activeImageUrl ? (
         <Animated.Image
           source={{ uri: activeImageUrl }}
-          style={[StyleSheet.absoluteFillObject, { opacity: imgOpacity }]}
+          style={[StyleSheet.absoluteFillObject, { opacity: contentOpacity }]}
           resizeMode="cover"
         />
       ) : (
@@ -291,14 +216,13 @@ export default function Home() {
         />
       )}
 
-      {/* Dark vignette tint so text is always readable */}
+      {/* Dark vignette tint */}
       <LinearGradient
         colors={['rgba(2,2,10,0.35)', 'rgba(2,2,10,0.15)', 'rgba(2,2,10,0.35)']}
         start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Animated blurry water-wave edges */}
       <WaveEdge side="top" />
       <WaveEdge side="bottom" />
       <WaveEdge side="left" />
@@ -322,27 +246,25 @@ export default function Home() {
         </BlurView>
       </View>
 
-      {/* CENTERED QUOTE */}
-      <View
+      {/* CENTERED QUOTE (Animated Opacity closely linked to image) */}
+      <Animated.View
         style={{
           position: "absolute",
-          top: 0,
-          bottom: 0,
-          left: 30,
-          right: 30,
+          top: 0, bottom: 0, left: 30, right: 30,
           justifyContent: "center",
           alignItems: "center",
           zIndex: 30,
+          opacity: contentOpacity,
         }}
       >
         {loading ? (
           <ActivityIndicator size="large" color="#FFFFFF" />
         ) : (
           <Text style={[styles.quoteText, { color: settings.quoteColor, fontFamily: fontObj.family }]}>
-            {aiMessage}
+            {currentQuote}
           </Text>
         )}
-      </View>
+      </Animated.View>
 
       {/* FONT MODAL */}
       <Modal visible={activeModal === 'font'} transparent animationType="slide">

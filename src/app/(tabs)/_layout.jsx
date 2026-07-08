@@ -18,70 +18,45 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: Platform.OS === "ios" ? 92 : 74,
           backgroundColor: "transparent",
           borderTopWidth: 0,
-          position: "absolute",
-          bottom: Platform.OS === "ios" ? 28 : 16,
-          left: 16,
-          right: 16,
-          borderRadius: 24,
-          height: 64,
-          elevation: 8,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.35,
-          shadowRadius: 16,
-          overflow: "hidden",
-          borderWidth: 1,
-          borderColor: "rgba(255, 255, 255, 0.08)",
-          paddingBottom: Platform.OS === "ios" ? 0 : 4,
-          paddingTop: 4,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarBackground: () => (
-          <View
+          <LinearGradient
+            colors={[
+              "rgba(0,0,0,1)",
+              "rgba(0,0,0,0.96)",
+              "rgba(0,0,0,1)",
+              "rgba(0,0,0,0.45)",
+              "transparent",
+            ]}
+            locations={[0, 0.25, 0.55, 0.8, 1]}
+            start={{ x: 0.5, y: 1 }}
+            end={{ x: 0.5, y: 0 }}
             style={{
               position: "absolute",
               left: 0,
               right: 0,
               top: 0,
-              bottom: 0,
-              borderRadius: 24,
-              overflow: "hidden",
+              bottom: -40,
             }}
-          >
-            <BlurView
-              intensity={80}
-              tint="dark"
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-              }}
-            />
-            <LinearGradient
-              colors={["rgba(30, 30, 35, 0.4)", "rgba(10, 10, 15, 0.8)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-              }}
-            />
-          </View>
+          />
         ),
         tabBarShowLabel: true,
         tabBarActiveTintColor: "#ffffff",
         tabBarInactiveTintColor: "#7a7a85",
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "600",
-          marginTop: 2,
-          fontFamily: "Inter",
+          fontSize: 11,
+          marginTop: 4,
+          fontWeight: "500",
+          opacity: 0.85,
         },
       }}
     >
@@ -140,7 +115,12 @@ export default function TabLayout() {
         name="board"
         options={{
           href: null,
-          tabBarStyle: { display: 'none' },
+          tabBarStyle: { 
+            display: 'none',
+            paddingBottom:
+              Platform.OS === "ios"
+                  ? insets.bottom + 8
+                  : 8, },
         }}
       />
 

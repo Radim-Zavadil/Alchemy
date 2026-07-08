@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, Pressable, Dimensions, ScrollView, TextInput,
   KeyboardAvoidingView, Platform, Modal, TouchableWithoutFeedback,
@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Sparkles, Plus, ArrowLeft } from 'lucide-react-native';
+import { Sparkles, Plus, ArrowLeft, Upload } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
@@ -22,6 +22,7 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
   const insets = useSafeAreaInsets();
   const [localDream, setLocalDream] = useState(dreamText);
 
+  // Compute dynamic score out of 10 base points
   const overallScore = useMemo(() => {
     const total = (metrics.health + metrics.mindset + metrics.career + metrics.relationships) / 4;
     return Math.round((total / 10) * 10) / 10; 
@@ -29,7 +30,8 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
 
   const fuelPercentage = Math.round((overallScore / 10) * 100);
 
-  const totalTicks = 50;
+  // Structural generation logic for gauge semicircle path
+  const totalTicks = 45;
   const activeTicksThreshold = Math.round((fuelPercentage / 100) * totalTicks);
 
   const contributors = [
@@ -40,30 +42,22 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
   ];
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-      style={{ flex: 1, backgroundColor: '#000000' }}
-    >
-      {/* Top Navbar Actions (Share removed) */}
-      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
-        <Pressable onPress={() => { onSaveDream(localDream); onBack(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, paddingV: 4 })}>
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      {/* Top Navbar Actions */}
+      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+        <Pressable onPress={() => { onSaveDream(localDream); onBack(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
           <ArrowLeft size={22} color="#ffffff" />
         </Pressable>
+        <Upload size={20} color="#ffffff" />
       </View>
 
-      <ScrollView 
-        style={{ flex: 1 }} 
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 80 }} 
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         
-        {/* Widened, Structured Half-Circle Gauge layout */}
+        {/* Radial Semi-Circle Layout */}
         <View style={ds.gaugeContainer}>
           <View style={ds.ticksWrapper}>
             {[...Array(totalTicks)].map((_, i) => {
-              // Exact 180-degree flat semicircle layout spanning from -90 to +90 degrees
-              const rotation = -90 + (i * (180 / (totalTicks - 1)));
+              const rotation = -110 + (i * (220 / (totalTicks - 1)));
               const isActive = i <= activeTicksThreshold;
               return (
                 <View 
@@ -71,8 +65,8 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
                   style={[
                     ds.tickLine, 
                     { 
-                      transform: [{ rotate: `${rotation}deg` }, { translateY: -115 }],
-                      backgroundColor: isActive ? '#ffffff' : 'rgba(255,255,255,0.12)'
+                      transform: [{ rotate: `${rotation}deg` }, { translateY: -90 }],
+                      backgroundColor: isActive ? '#ffffff' : 'rgba(255,255,255,0.15)'
                     }
                   ]} 
                 />
@@ -80,7 +74,7 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
             })}
           </View>
 
-          {/* Core Central Metrics nested safely within the arch path */}
+          {/* Central Overlay */}
           <View style={ds.scoreOverlay}>
             <Text style={ds.hugeScore}>{Math.round(overallScore)}</Text>
             <Text style={ds.scoreLabel}>Fueling Score</Text>
@@ -88,17 +82,20 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
           </View>
         </View>
 
-        {/* Dynamic Descriptive Section */}
+        {/* Dynamic Highlight Paragraph Description */}
         <Text style={ds.descriptionParagraph}>
           You were optimally fueled for <Text style={{ color: '#0ac378', fontWeight: '600' }}>{fuelPercentage}%</Text> of the time during your workout. This helps <Text style={{ color: '#0ac378', fontWeight: '600' }}>improve exercise performance</Text>.
         </Text>
 
-        {/* Shorter Fueling Contributors List Section */}
+        {/* Fueling Contributors List */}
         <Text style={ds.sectionHeader}>Fueling Contributors</Text>
-        <View style={{ gap: 8, marginBottom: 36 }}>
+        <View style={{ gap: 10, marginBottom: 36 }}>
           {contributors.map((item) => (
             <View key={item.label} style={ds.contributorRow}>
+              {/* Underlying dynamic progress bar strip */}
               <View style={[ds.behindFillTrack, { width: `${item.value}%`, backgroundColor: item.color }]} />
+              
+              {/* Clear front labels */}
               <Text style={ds.contributorLabel}>{item.label}</Text>
               <Text style={ds.contributorValue}>{item.value}%</Text>
             </View>
@@ -120,7 +117,7 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
           placeholderTextColor="rgba(255,255,255,0.25)"
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -361,18 +358,18 @@ const s = StyleSheet.create({
 });
 
 const ds = StyleSheet.create({
-  gaugeContainer: { height: 160, alignItems: 'center', justifyContent: 'center', marginTop: 24, position: 'relative', width: '100%' },
-  ticksWrapper: { position: 'absolute', width: 260, height: 260, alignItems: 'center', justifyContent: 'center', top: -35 },
-  tickLine: { position: 'absolute', width: 2.5, height: 10, borderRadius: 1 },
-  scoreOverlay: { alignItems: 'center', justifyContent: 'center', position: 'absolute', top: 35 },
-  hugeScore: { color: '#ffffff', fontSize: 52, fontWeight: '800', letterSpacing: -0.5 },
-  scoreLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', textTransform: 'capitalize', marginTop: -4 },
-  statusText: { color: '#ffffff', fontSize: 16, fontWeight: '600', marginTop: 12 },
-  descriptionParagraph: { color: 'rgba(255,255,255,0.65)', fontSize: 14, textAlign: 'center', lineHeight: 22, paddingHorizontal: 12, marginBottom: 36, marginTop: 24 },
-  sectionHeader: { color: '#ffffff', fontSize: 15, fontWeight: '600', marginBottom: 12, paddingHorizontal: 4 },
-  contributorRow: { height: 28, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, position: 'relative', overflow: 'hidden', borderRadius: 6 },
+  gaugeContainer: { height: 220, alignItems: 'center', justifyContent: 'center', marginTop: 10, position: 'relative' },
+  ticksWrapper: { position: 'absolute', width: 200, height: 200, alignItems: 'center', justifyContent: 'center' },
+  tickLine: { position: 'absolute', width: 3, height: 12, borderRadius: 1 },
+  scoreOverlay: { alignItems: 'center', marginTop: 35 },
+  hugeScore: { color: '#ffffff', fontSize: 72, fontWeight: '800', letterSpacing: -1 },
+  scoreLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500', textTransform: 'capitalize', marginTop: -6 },
+  statusText: { color: '#ffffff', fontSize: 18, fontWeight: '600', marginTop: 4 },
+  descriptionParagraph: { color: 'rgba(255,255,255,0.7)', fontSize: 15, textAlign: 'center', lineHeight: 24, paddingHorizontal: 16, marginBottom: 40, marginTop: 10 },
+  sectionHeader: { color: '#ffffff', fontSize: 16, fontWeight: '600', marginBottom: 16, paddingHorizontal: 4 },
+  contributorRow: { height: 38, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, position: 'relative', overflow: 'hidden', borderRadius: 8 },
   behindFillTrack: { position: 'absolute', top: 0, bottom: 0, left: 0 },
-  contributorLabel: { color: '#ffffff', fontSize: 13, fontWeight: '400' },
-  contributorValue: { color: '#ffffff', fontSize: 13, fontWeight: '500' },
-  pureTextArea: { color: '#ffffff', fontSize: 14, lineHeight: 22, paddingHorizontal: 4, paddingTop: 4, minHeight: 100, textAlignVertical: 'top', backgroundColor: 'transparent' }
+  contributorLabel: { color: '#ffffff', fontSize: 14, fontWeight: '500' },
+  contributorValue: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  pureTextArea: { color: '#ffffff', fontSize: 14, lineHeight: 22, paddingHorizontal: 4, paddingTop: 4, textAlignVertical: 'top', backgroundColor: 'transparent' }
 });
