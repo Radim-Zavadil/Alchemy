@@ -2,7 +2,7 @@
 import {
   View, Text, Pressable, Dimensions, ScrollView, TextInput,
   KeyboardAvoidingView, Platform, Modal, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator,
+  StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,9 +44,9 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
       style={{ flex: 1, backgroundColor: '#000000' }}
     >
-      {/* Top Navbar Actions (Share removed) */}
+      {/* Top Navbar Actions */}
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
-        <Pressable onPress={() => { onSaveDream(localDream); onBack(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, paddingV: 4 })}>
+        <Pressable onPress={() => { onSaveDream(localDream); onBack(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, paddingVertical: 4 })}>
           <ArrowLeft size={22} color="#ffffff" />
         </Pressable>
       </View>
@@ -62,7 +62,6 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
         <View style={ds.gaugeContainer}>
           <View style={ds.ticksWrapper}>
             {[...Array(totalTicks)].map((_, i) => {
-              // Exact 180-degree flat semicircle layout spanning from -90 to +90 degrees
               const rotation = -90 + (i * (180 / (totalTicks - 1)));
               const isActive = i <= activeTicksThreshold;
               return (
@@ -219,9 +218,9 @@ export default function JournalScreen() {
   ];
 
   const MAIN_TABS = [
-    { id: 'health', label: 'Health' },
-    { id: 'career', label: 'Career' },
-    { id: 'relationships', label: 'Relationships' },
+    { id: 'health', label: 'Health', icon: require('../../../assets/images/icons/health.png') },
+    { id: 'career', label: 'Career', icon: require('../../../assets/images/icons/career.png') },
+    { id: 'relationships', label: 'Relationships', icon: require('../../../assets/images/icons/relationships.png') },
   ];
 
   const renderProgressBar = (labelName, valueKey) => {
@@ -243,6 +242,26 @@ export default function JournalScreen() {
         <View style={{ height: 4, backgroundColor: '#333339', borderRadius: 2, width: '100%', overflow: 'hidden' }}>
           <View style={{ height: '100%', width: `${value}%`, backgroundColor: '#ffffff', borderRadius: 2 }} />
         </View>
+      </View>
+    );
+  };
+
+  // Helper inside loop to extract the first significant metric change tag
+  const renderTrendTag = (metricsChanged) => {
+    if (!metricsChanged) return null;
+    const items = Object.entries(metricsChanged);
+    const primary = items.find(([_, val]) => val !== 0) || items[0];
+    if (!primary || primary[1] === 0) return null;
+
+    const [key, val] = primary;
+    const isUp = val > 0;
+    const displayLabel = key.charAt(0).toUpperCase() + key.slice(1);
+    
+    return (
+      <View style={[tl.tagContainer, { backgroundColor: isUp ? 'rgba(10,195,120,0.08)' : 'rgba(255,80,60,0.08)' }]}>
+        <Text style={[tl.tagText, { color: isUp ? '#0ac378' : '#ff503c' }]}>
+          {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{val}% {displayLabel}
+        </Text>
       </View>
     );
   };
@@ -270,14 +289,18 @@ export default function JournalScreen() {
             </View>
           </View>
 
-          <View style={{ marginBottom: 32 }}>
+          <View style={{ marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
               {MAIN_TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
-                  <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1, paddingVertical: 12, position: 'relative' }}>
-                    <Text style={{ fontSize: 24, fontWeight: '300', color: isActive ? '#ffffff' : '#555555' }}>{metrics[tab.id]}%</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '500', color: isActive ? '#ffffff' : '#555555', marginTop: 4 }}>{tab.label}</Text>
+                  <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1, paddingVertical: 12, position: 'relative', opacity: isActive ? 1 : 0.4 }}>
+                    <Image 
+                      source={tab.icon} 
+                      style={{ width: 80, height: 80, marginBottom: 8, resizeMode: 'contain' }} 
+                    />
+                    <Text style={{ fontSize: 27, fontWeight: '500', color: '#ffffff' }}>{metrics[tab.id]}%</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#ffffff', marginTop: 4, letterSpacing: 1.3 }}>{tab.label.toUpperCase()}</Text>
                     {isActive && <View style={{ position: 'absolute', bottom: 0, left: 16, right: 16, height: 2, backgroundColor: '#ffffff' }} />}
                   </Pressable>
                 );
@@ -291,23 +314,48 @@ export default function JournalScreen() {
             </View>
           </View>
 
-          <View style={{ gap: 28 }}>
+          {/* GENERATED CONTENT MARGIN SEPARATOR BUFFER */}
+          <View style={{ marginTop: 32, gap: 0 }}>
             {reviews.length === 0 ? (
               <View style={{ paddingVertical: 52, alignItems: 'center' }}>
                 <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 14, textAlign: 'center' }}>{'No logs yet.\nTap + to write your first weekly review.'}</Text>
               </View>
             ) : (
-              [...reviews].reverse().map((item, idx) => (
-                <View key={item.id} style={{ paddingLeft: 30, position: 'relative' }}>
-                  {idx < reviews.length - 1 && <View style={{ position: 'absolute', left: 7, top: 20, bottom: -36, width: 1, backgroundColor: 'rgba(255,255,255,0.07)' }} />}
-                  <View style={{ position: 'absolute', left: 0, top: 9, width: 15, height: 15, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' }} />
-                  <Text style={{ color: '#ffffff', fontSize: 17, fontWeight: '700', marginBottom: 3 }}>{item.title}</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11, marginBottom: 13 }}>{formatDate(item.date)}</Text>
-                  <View style={{ gap: 6 }}>
-                    {Object.entries(item.answers).map(([k, v]) => v ? <Text key={k} style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}><Text style={{ color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>{k}: </Text>{v}</Text> : null)}
+              [...reviews].reverse().map((item, idx, reversedArr) => {
+                const isFirst = idx === 0;
+                const isLast = idx === reversedArr.length - 1;
+
+                return (
+                  <View key={item.id} style={tl.rowItem}>
+                    {/* ACCURATE INDEPENDENT TIMELINE CONNECTOR LINE AXIS COMPONENTS */}
+                    <View style={tl.axisColumn}>
+                      <View style={[tl.lineSegment, { backgroundColor: isFirst ? 'transparent' : 'rgba(255,255,255,0.1)' }]} />
+                      <View style={tl.cleanDotNode} />
+                      <View style={[tl.lineSegment, { backgroundColor: isLast ? 'transparent' : 'rgba(255,255,255,0.1)' }]} />
+                    </View>
+
+                    {/* MAIN EXPANDED CONTENT DATA AREA WITH CORNER PROGRESS CHIP TAGS */}
+                    <View style={tl.bodyCard}>
+                      <View style={tl.cardHeaderGroup}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
+                          <Text style={{ color: '#ffffff', fontSize: 17, fontWeight: '700', marginBottom: 3 }} numberOfLines={1}>{item.title}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>{formatDate(item.date)}</Text>
+                        </View>
+                        {renderTrendTag(item.metricsChanged)}
+                      </View>
+                      
+                      <View style={{ gap: 6, marginTop: 12 }}>
+                        {Object.entries(item.answers).map(([k, v]) => v ? (
+                          <Text key={k} style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
+                            <Text style={{ color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>{k}: </Text>
+                            {v}
+                          </Text>
+                        ) : null)}
+                      </View>
+                    </View>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
         </ScrollView>
@@ -358,6 +406,17 @@ const s = StyleSheet.create({
   fieldInput: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, paddingHorizontal: 12, height: 38, color: '#fff', fontSize: 12 },
   cancelBtn: { flex: 1, height: 42, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
   saveBtn: { flex: 1.5, height: 42, borderRadius: 12, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' },
+});
+
+const tl = StyleSheet.create({
+  rowItem: { flexDirection: 'row', width: '100%', minHeight: 90 },
+  axisColumn: { width: 16, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  lineSegment: { flex: 1, width: 1 },
+  cleanDotNode: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: 'rgba(255,255,255,0.45)', marginVertical: 4 },
+  bodyCard: { flex: 1, paddingLeft: 16, paddingBottom: 24, paddingTop: 2 },
+  cardHeaderGroup: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' },
+  tagContainer: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  tagText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.2 }
 });
 
 const ds = StyleSheet.create({

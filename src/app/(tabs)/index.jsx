@@ -2,7 +2,7 @@
 import {
   View, Dimensions, Text, ActivityIndicator,
   StyleSheet, Image, Animated, Pressable,
-  Modal, ScrollView, TouchableOpacity, PanResponder, Platform,
+  Modal, ScrollView, TouchableOpacity, PanResponder, Platform, Easing
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,6 +95,14 @@ export default function Home() {
   });
   const [activeModal, setActiveModal] = useState(null);
   const [curImgIdx, setCurImgIdx] = useState(0);
+  const [nextImgIdx, setNextImgIdx] = useState(null);
+
+  // Animation values for AirDrop sequence
+  const topAnimY = useRef(new Animated.Value(-160)).current;
+  const topAnimOpacity = useRef(new Animated.Value(0)).current;
+  const bubbleAnimY = useRef(new Animated.Value(height + 150)).current;
+  const bubbleAnimScale = useRef(new Animated.Value(0.7)).current;
+  const bubbleAnimOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     AsyncStorage.getItem(SETTINGS_KEY).then(v => { if (v) setSettings(JSON.parse(v)); });
@@ -126,7 +134,6 @@ export default function Home() {
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  // 1. Gather all unique text quotes into an array
   const allMessages = useMemo(() => {
     if (!dream && reviews.length === 0) {
       return ["Open the Review tab, describe your dream, and write your first weekly log — the portal will begin to see."];
@@ -150,45 +157,79 @@ export default function Home() {
     return msgs;
   }, [dream, reviews]);
 
-  // Fade animations for text & images syncing together
   const contentOpacity = useRef(new Animated.Value(1)).current;
+  const nextContentOpacity = useRef(new Animated.Value(0)).current;
   const swipeLock = useRef(false);
 
   const changeSlide = useCallback((dir) => {
     if (swipeLock.current) return;
     swipeLock.current = true;
 
-    // Fade out both text and image together
-    Animated.timing(contentOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
-      setCurImgIdx(p => {
-        // Find the maximum limit based on images or quotes to prevent stale states
-        const maxLimit = userImages.length > 0 ? userImages.length : allMessages.length;
-        return (p + dir + maxLimit) % maxLimit;
-      });
+    const maxLimit = userImages.length > 0 ? userImages.length : allMessages.length;
+    const targetIdx = (curImgIdx + dir + maxLimit) % maxLimit;
+    setNextImgIdx(targetIdx);
 
-      // Fade back in with the new contents loaded
-      Animated.timing(contentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start(() => {
+    // Reset layout variables cleanly
+    topAnimY.setValue(-160);
+    topAnimOpacity.setValue(0);
+    bubbleAnimY.setValue(height + 150);
+    bubbleAnimScale.setValue(0.7);
+    bubbleAnimOpacity.setValue(0);
+
+    Animated.parallel([
+      Animated.timing(contentOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+      Animated.timing(nextContentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      
+      // Top plate entry (Hugs top edge tightly, slightly out of screen)
+      Animated.parallel([
+        Animated.timing(topAnimY, { toValue: insets.top - 10, duration: 450, easing: Easing.out(Easing.back(0.8)), useNativeDriver: true }),
+        Animated.timing(topAnimOpacity, { toValue: 1, duration: 300, useNativeDriver: true })
+      ]),
+
+      // Bubble pop sequence rising towards top plate boundary
+      Animated.parallel([
+        Animated.timing(bubbleAnimOpacity, { toValue: 0.3, duration: 500, useNativeDriver: true }), // Clean max animated opacity target
+        Animated.timing(bubbleAnimScale, { toValue: 1, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(bubbleAnimY, { toValue: height * 0.35, duration: 500, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          // Anchored to top: 0, so we subtract native elements or style offsets cleanly
+          Animated.timing(bubbleAnimY, { toValue: insets.top - 120, duration: 300, easing: Easing.bezier(0.4, 0, 0.6, 0.15), useNativeDriver: true })
+        ])
+      ])
+    ]).start(() => {
+      setCurImgIdx(targetIdx);
+      setNextImgIdx(null);
+      contentOpacity.setValue(1);
+      nextContentOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(topAnimY, { toValue: -160, duration: 350, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(topAnimOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(bubbleAnimScale, { toValue: 0.7, duration: 300, useNativeDriver: true }),
+        Animated.timing(bubbleAnimOpacity, { toValue: 0, duration: 250, useNativeDriver: true })
+      ]).start(() => {
         swipeLock.current = false;
       });
     });
-  }, [userImages.length, allMessages.length]);
+  }, [curImgIdx, userImages.length, allMessages.length, insets.top]);
 
   const swipeResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (e, gs) => Math.abs(gs.dy) > 10,
-    // Evaluate gesture ONLY when the drag finishes to avoid multi-firing
     onPanResponderRelease: (e, gs) => {
       if (gs.dy < -60) {
-        changeSlide(1); // Swiped UP (Scroll down)
+        changeSlide(1); 
       } else if (gs.dy > 60) {
-        changeSlide(-1); // Swiped DOWN (Scroll up)
+        changeSlide(-1);
       }
     },
   })).current;
 
-  // Deriving active image and active text safely based on current index counter
   const activeImageUrl = userImages.length > 0 ? userImages[curImgIdx % userImages.length]?.url : null;
+  const nextImageUrl = (userImages.length > 0 && nextImgIdx !== null) ? userImages[nextImgIdx % userImages.length]?.url : null;
+
   const currentQuote = allMessages[curImgIdx % allMessages.length] || '';
+  const nextQuote = nextImgIdx !== null ? (allMessages[nextImgIdx % allMessages.length] || '') : '';
   const fontObj = FONTS.find(f => f.id === settings.quoteFont) || FONTS[0];
 
   const panResponder = useRef(PanResponder.create({
@@ -201,18 +242,28 @@ export default function Home() {
     <View style={{ flex: 1, backgroundColor: '#020206' }} {...swipeResponder.panHandlers}>
       <StatusBar style="light" />
 
-      {/* Full-screen background: image or deep space */}
-      {activeImageUrl ? (
+      {/* BASE FALLBACK LAYER */}
+      <LinearGradient
+        colors={['#020410', '#06102a', '#020208', '#03010e']}
+        start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* CURRENT IMAGE */}
+      {activeImageUrl && (
         <Animated.Image
           source={{ uri: activeImageUrl }}
           style={[StyleSheet.absoluteFillObject, { opacity: contentOpacity }]}
           resizeMode="cover"
         />
-      ) : (
-        <LinearGradient
-          colors={['#020410', '#06102a', '#020208', '#03010e']}
-          start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
+      )}
+
+      {/* NEXT IMAGE */}
+      {nextImageUrl && (
+        <Animated.Image
+          source={{ uri: nextImageUrl }}
+          style={[StyleSheet.absoluteFillObject, { opacity: nextContentOpacity }]}
+          resizeMode="cover"
         />
       )}
 
@@ -246,25 +297,51 @@ export default function Home() {
         </BlurView>
       </View>
 
-      {/* CENTERED QUOTE (Animated Opacity closely linked to image) */}
-      <Animated.View
-        style={{
-          position: "absolute",
-          top: 0, bottom: 0, left: 30, right: 30,
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 30,
-          opacity: contentOpacity,
-        }}
-      >
+      {/* CENTERED QUOTE */}
+      <View style={{ position: 'absolute', top: 0, bottom: 0, left: 30, right: 30, justifyContent: 'center', alignItems: 'center', zIndex: 30 }} pointerEvents="none">
         {loading ? (
           <ActivityIndicator size="large" color="#FFFFFF" />
         ) : (
-          <Text style={[styles.quoteText, { color: settings.quoteColor, fontFamily: fontObj.family }]}>
-            {currentQuote}
-          </Text>
+          <>
+            <Animated.Text style={[styles.quoteText, { color: settings.quoteColor, fontFamily: fontObj.family, opacity: contentOpacity, position: 'absolute' }]}>
+              {currentQuote}
+            </Animated.Text>
+            {nextImgIdx !== null && (
+              <Animated.Text style={[styles.quoteText, { color: settings.quoteColor, fontFamily: fontObj.family, opacity: nextContentOpacity, position: 'absolute' }]}>
+                {nextQuote}
+              </Animated.Text>
+            )}
+          </>
         )}
-      </Animated.View>
+      </View>
+
+      {/* ENHANCED AIRDROP ANIMATION OVERLAYS */}
+      <Animated.Image
+        source={require('../../../assets/images/blurs/top.png')}
+        style={[
+          styles.airdropTop,
+          {
+            transform: [{ translateY: topAnimY }],
+            opacity: topAnimOpacity,
+          }
+        ]}
+        resizeMode="contain"
+      />
+
+      <Animated.Image
+        source={require('../../../assets/images/blurs/bubble.png')}
+        style={[
+          styles.airdropBubble,
+          {
+            transform: [
+              { translateY: bubbleAnimY },
+              { scale: bubbleAnimScale }
+            ],
+            opacity: bubbleAnimOpacity,
+          }
+        ]}
+        resizeMode="contain"
+      />
 
       {/* FONT MODAL */}
       <Modal visible={activeModal === 'font'} transparent animationType="slide">
@@ -316,6 +393,23 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowRadius: 16,
     letterSpacing: 0.2,
+  },
+  airdropTop: {
+    position: 'absolute',
+    top: 0,
+    left: (width - 1010) / 2,
+    width: 1010,
+    height: 500,
+    marginTop: -65, 
+    zIndex: 99,
+  },
+  airdropBubble: {
+    position: 'absolute',
+    top: 0,                    // Anchored at the top boundary layout instead of bottom-hanging
+    left: (width - 620) / 2,
+    width: 620,
+    height: 620,
+    zIndex: 100,
   },
   sheet: { borderTopLeftRadius: 40, borderTopRightRadius: 40, paddingHorizontal: 20, paddingBottom: 48, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   sheetHead: { alignItems: 'center', paddingVertical: 16 },
