@@ -12,6 +12,7 @@ import { BookOpen } from "lucide-react-native";
  */
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = Platform.OS === "ios" ? 92 : 74;
 
   return (
     <Tabs
@@ -22,7 +23,7 @@ export default function TabLayout() {
           left: 0,
           right: 0,
           bottom: 0,
-          height: Platform.OS === "ios" ? 92 : 74,
+          height: tabBarHeight,
           backgroundColor: "transparent",
           borderTopWidth: 0,
           elevation: 0,
@@ -30,22 +31,24 @@ export default function TabLayout() {
         },
         tabBarBackground: () => (
           <LinearGradient
+            // Fades from transparent at the very top to solid black where the icons start
             colors={[
-              "rgba(0,0,0,1)",
-              "rgba(0,0,0,0.96)",
-              "rgba(0,0,0,1)",
-              "rgba(0,0,0,0.45)",
-              "transparent",
+              "transparent", 
+              "rgba(0,0,0,0.4)", 
+              "rgba(0,0,0,0.95)", 
+              "rgba(0,0,0,1)"
             ]}
-            locations={[0, 0.25, 0.55, 0.8, 1]}
-            start={{ x: 0.5, y: 1 }}
-            end={{ x: 0.5, y: 0 }}
+            // 0.0 is the top of the container (-40px above the tab bar). 
+            // By 0.4 (roughly where the tab bar actually begins), it becomes fully solid black.
+            locations={[0, 0.15, 0.35, 0.4]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
             style={{
               position: "absolute",
               left: 0,
               right: 0,
-              top: 0,
-              bottom: -40,
+              top: -40, // Pulls the gradient up to start fading out *above* the actual tab bar
+              bottom: 0,
             }}
           />
         ),
@@ -117,13 +120,10 @@ export default function TabLayout() {
           href: null,
           tabBarStyle: { 
             display: 'none',
-            paddingBottom:
-              Platform.OS === "ios"
-                  ? insets.bottom + 8
-                  : 8, },
+            paddingBottom: Platform.OS === "ios" ? insets.bottom + 8 : 8, 
+          },
         }}
       />
-
     </Tabs>
   );
 }

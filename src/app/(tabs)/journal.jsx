@@ -1,36 +1,67 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, Pressable, Dimensions, ScrollView, TextInput,
-  KeyboardAvoidingView, Platform, Modal, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator, Image,
+  KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator, Image,
+  Modal, Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Sparkles, Plus, ArrowLeft } from 'lucide-react-native';
+import { Sparkles, Plus, ArrowLeft, Image as ImageIcon, ArrowUp, X, List, MessageSquare } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 const REVIEWS_KEY = 'alchemy_reviews';
-const DREAM_KEY = 'alchemy_user_dream';
+const DREAM_KEY = 'alchemy_user_dream_v3'; 
 
 const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-// ==========================================
-// SUB-SCREEN: DREAM VIEW (INLINE IN OBJECT)
-// ==========================================
-function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
+// ============================================================
+// SUB-COMPONENT: DREAM VIEW (THE MAIN UPDATE SCREEN MODE)
+// ============================================================
+function DreamView({ metrics, dreamData, onSaveDream, onBack }) {
   const insets = useSafeAreaInsets();
-  const [localDream, setLocalDream] = useState(dreamText);
+  const [localDream, setLocalDream] = useState(dreamData || {});
+  const [images, setImages] = useState(dreamData?.uploadedImages || {});
+  const [viewingAiChat, setViewingAiChat] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  const HEADER_HEIGHT = insets.top + 50;
 
+  // Question handlers
+  const updateQuestion = (key, text) => {
+    setIsEditing(true);
+    const updated = { ...localDream, [key]: text, uploadedImages: images };
+    setLocalDream(updated);
+  };
+
+  const handleSaveButtonPress = () => {
+    onSaveDream(localDream);
+    setIsEditing(false);
+  };
+
+  const handleSimulateGallery = (key) => {
+    setIsEditing(true);
+    const newImages = { ...images };
+    if (newImages[key]) {
+      delete newImages[key];
+    } else {
+      newImages[key] = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80';
+    }
+    setImages(newImages);
+    const updated = { ...localDream, uploadedImages: newImages };
+    setLocalDream(updated);
+  };
+
+  // Performance calculations
   const overallScore = useMemo(() => {
     const total = (metrics.health + metrics.mindset + metrics.career + metrics.relationships) / 4;
-    return Math.round((total / 10) * 10) / 10; 
+    return Math.round(total);
   }, [metrics]);
 
-  const fuelPercentage = Math.round((overallScore / 10) * 100);
-
-  const totalTicks = 50;
-  const activeTicksThreshold = Math.round((fuelPercentage / 100) * totalTicks);
+  const totalTicks = 85; 
+  const activeTicksThreshold = Math.round((overallScore / 100) * totalTicks);
 
   const contributors = [
     { label: 'Health', value: metrics.health, color: 'rgba(255, 255, 255, 0.08)' },
@@ -39,62 +70,123 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
     { label: 'Relationships', value: metrics.relationships, color: 'rgba(255, 255, 255, 0.08)' },
   ];
 
+  const DREAM_QUESTIONS = [
+    { key: 'q1', label: 'What are your the most important goals and when do you want to achieve them?', hasImage: false },
+    { key: 'q2', label: 'How should look like your dream home?', hasImage: true },
+    { key: 'q3', label: 'Do you have dream car?', hasImage: true },
+    { key: 'q4', label: 'Do you have dream fashion style?', hasImage: true },
+    { key: 'q5', label: 'What is your dream fitness level?', hasImage: true },
+    { key: 'q6', label: 'Paint a picture of your dream business life.', hasImage: true },
+    { key: 'q7', label: 'Who are people you deeply admire, respect, or aspire to be like?', hasImage: true },
+    { key: 'q8', label: 'What does financial freedom look like to you?', hasImage: false },
+    { key: 'q9', label: 'What does your dream family and relationship look like?', hasImage: true },
+    { key: 'q10', label: 'What does your perfect day look like from morning to night?', hasImage: false },
+    { key: 'q11', label: 'Add photos of activities and hobbies you want to enjoy.', hasImage: true },
+    { key: 'q12', label: 'What would you regret most if you looked back 1 year from now and hadn\'t accomplished it?', hasImage: false },
+    { key: 'q13', label: 'What specific traits, behaviours, qualities, or achievements make you admire these people?', hasImage: false },
+    { key: 'q14', label: 'What specific traits, behaviors, or qualities do you dislike about these people?', hasImage: false },
+    { key: 'q15', label: 'What specific skills, knowledge, and qualities does this future self have that you currently lack or need to develop?', hasImage: false },
+    { key: 'q16', label: 'What daily habits and routines does this future self maintain consistently?', hasImage: false },
+    { key: 'q17', label: 'What bad habits, patterns, or behaviours has this future self eliminated that you currently struggle with?', hasImage: false },
+    { key: 'q18', label: 'How does this future self present themselves?', hasImage: false },
+    { key: 'q19', label: 'If people were talking about this future you at a coffee shop, what would they say?', hasImage: false },
+    { key: 'q20', label: 'What specific fears, doubts, and limiting beliefs are holding you back from becoming the person you admire and dream of being?', hasImage: false },
+    { key: 'q21', label: 'What current commitments, responsibilities, or comfort zones keep you stuck in your current identity instead of transforming into your future self?', hasImage: false },
+    { key: 'q22', label: 'What\'s the single biggest thing that must change for you to bridge the gap between who you are now and your future self?', hasImage: false },
+  ];
+
+  if (viewingAiChat) {
+    return <AiChatView onBack={() => setViewingAiChat(false)} />;
+  }
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
       style={{ flex: 1, backgroundColor: '#000000' }}
     >
-      {/* Top Navbar Actions */}
-      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', zIndex: 10 }}>
-        <Pressable onPress={() => { onSaveDream(localDream); onBack(); }} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, paddingVertical: 4 })}>
-          <ArrowLeft size={22} color="#ffffff" />
-        </Pressable>
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <Image 
+          source={require('../../../assets/images/blurs/top.png')} 
+          style={ds.topBlurBackground} 
+        />
       </View>
 
       <ScrollView 
         style={{ flex: 1 }} 
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 80 }} 
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: insets.top + 10, paddingBottom: 140 }} 
+        showsVerticalScrollIndicator={false} 
         keyboardShouldPersistTaps="handled"
       >
+        {/* Scrollable, Non-Sticky Custom Header */}
+        <View style={{ height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 10 }}>
+          <Pressable onPress={onBack} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, width: 30 })}>
+            <ArrowLeft size={22} color="#ffffff" />
+          </Pressable>
+          <Text style={ds.headerTitle}>Dream Vision Blueprint</Text>
+          <Pressable onPress={() => setViewingAiChat(true)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, width: 30, alignItems: 'flex-end' })}>
+            <MessageSquare size={20} color="#ffffff" />
+          </Pressable>
+        </View>
         
-        {/* Widened, Structured Half-Circle Gauge layout */}
-        <View style={ds.gaugeContainer}>
-          <View style={ds.ticksWrapper}>
-            {[...Array(totalTicks)].map((_, i) => {
-              const rotation = -90 + (i * (180 / (totalTicks - 1)));
-              const isActive = i <= activeTicksThreshold;
-              return (
-                <View 
-                  key={i} 
-                  style={[
-                    ds.tickLine, 
-                    { 
-                      transform: [{ rotate: `${rotation}deg` }, { translateY: -115 }],
-                      backgroundColor: isActive ? '#ffffff' : 'rgba(255,255,255,0.12)'
-                    }
-                  ]} 
-                />
-              );
-            })}
+        {/* Main Performance Metric Gauge Box */}
+        <View style={ds.metricsCardContainer}>
+          <View style={ds.gaugeContainer}>
+            <View style={ds.ticksWrapper}>
+              {[...Array(totalTicks)].map((_, i) => {
+                const rotation = -90 + (i * (180 / (totalTicks - 1)));
+                const isActive = i <= activeTicksThreshold;
+                return (
+                  <View 
+                    key={i} 
+                    style={[
+                      ds.tickLine, 
+                      { 
+                        transform: [{ rotate: `${rotation}deg` }, { translateY: -125 }], 
+                        backgroundColor: isActive ? '#dcdcdc' : 'rgba(240, 240, 240, 0.18)',
+                        height: 12
+                      }
+                    ]} 
+                  />
+                );
+              })}
+            </View>
+            <View style={ds.scoreOverlay}>
+              <Text style={ds.hugeScore}>{overallScore}</Text>
+              <Text style={ds.inRangeTag}>In range <Text style={{ color: '#0ac378' }}>●</Text></Text>
+              <Text style={ds.scoreLabel}>DREAM VISION ALIGNMENT SCORE</Text>
+              <Text style={ds.dateSubText}>Today</Text>
+            </View>
           </View>
 
-          {/* Core Central Metrics nested safely within the arch path */}
-          <View style={ds.scoreOverlay}>
-            <Text style={ds.hugeScore}>{Math.round(overallScore)}</Text>
-            <Text style={ds.scoreLabel}>Fueling Score</Text>
-            <Text style={ds.statusText}>Optimally Fueled</Text>
+          <View style={ds.horizontalDivider} />
+
+          {/* Sub-metrics Row Under Gauge */}
+          <View style={ds.subMetricsRow}>
+            <View style={ds.subMetricItem}>
+              <Text style={ds.subMetricLabel}>Consistency</Text>
+              <Text style={ds.subMetricValue}>78% <Text style={{ color: '#e91e63', fontSize: 10 }}>●</Text></Text>
+            </View>
+            <View style={ds.subMetricItem}>
+              <Text style={ds.subMetricLabel}>Trajectory</Text>
+              <Text style={ds.subMetricValue}>85% <Text style={{ color: '#0ac378', fontSize: 10 }}>●</Text></Text>
+            </View>
           </View>
         </View>
 
-        {/* Dynamic Descriptive Section */}
-        <Text style={ds.descriptionParagraph}>
-          You were optimally fueled for <Text style={{ color: '#0ac378', fontWeight: '600' }}>{fuelPercentage}%</Text> of the time during your workout. This helps <Text style={{ color: '#0ac378', fontWeight: '600' }}>improve exercise performance</Text>.
-        </Text>
+        {/* Update Recap Message Container */}
+        <Pressable onPress={() => setViewingAiChat(true)} style={({ pressed }) => [ds.recapCardContainer, { opacity: pressed ? 0.85 : 1 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={ds.recapHeader}>DREAM VISION UPDATE</Text>
+            <Sparkles size={12} color="rgba(255,255,255,0.4)" />
+          </View>
+          <Text style={ds.recapBodyText}>
+            You are consistent with your highest leverage actions! Your Trajectory has improved by <Text style={{ color: '#0ac378', fontWeight: '600' }}>12%</Text>. Maintain this momentum to reach your 1-year goals.
+          </Text>
+        </Pressable>
 
-        {/* Shorter Fueling Contributors List Section */}
-        <Text style={ds.sectionHeader}>Fueling Contributors</Text>
-        <View style={{ gap: 8, marginBottom: 36 }}>
+        {/* Contributors */}
+        <Text style={[ds.sectionHeader, { paddingHorizontal: 12 }]}>Fueling Contributors</Text>
+        <View style={{ gap: 4, marginBottom: 36, paddingHorizontal: 12 }}>
           {contributors.map((item) => (
             <View key={item.label} style={ds.contributorRow}>
               <View style={[ds.behindFillTrack, { width: `${item.value}%`, backgroundColor: item.color }]} />
@@ -104,43 +196,211 @@ function DreamView({ metrics, dreamText, onSaveDream, onBack }) {
           ))}
         </View>
 
-        {/* Pure minimalist dream text view region */}
-        <Text style={[ds.sectionHeader, { marginBottom: 10 }]}>Dream Vision</Text>
-        <TextInput
-          style={ds.pureTextArea}
-          multiline
-          scrollEnabled={false}
-          value={localDream}
-          onChangeText={(text) => {
-            setLocalDream(text);
-            onSaveDream(text);
-          }}
-          placeholder="Type your ideal future target layout metrics here..."
-          placeholderTextColor="rgba(255,255,255,0.25)"
-        />
+        <Text style={[ds.sectionHeader, { marginBottom: 24, fontSize: 18, paddingHorizontal: 12 }]}>Dream Vision Blueprint</Text>
+        
+        <View style={{ paddingHorizontal: 12 }}>
+          {DREAM_QUESTIONS.map((q) => (
+            <View key={q.key} style={{ marginBottom: 36 }}>
+              <View style={ds.questionHeaderRow}>
+                <Text style={ds.questionLabel}>{q.label}</Text>
+                {q.hasImage && (
+                  <Pressable onPress={() => handleSimulateGallery(q.key)} style={({ pressed }) => [ds.inlineImagePicker, { opacity: pressed ? 0.5 : 1 }]}>
+                    <ImageIcon size={18} color={images[q.key] ? '#0ac378' : 'rgba(255,255,255,0.4)'} />
+                  </Pressable>
+                )}
+              </View>
+
+              {images[q.key] && (
+                <View style={ds.squareImagePreviewContainer}>
+                  <Pressable style={{ flex: 1 }} onPress={() => setSelectedImage(images[q.key])}>
+                    <Image source={{ uri: images[q.key] }} style={ds.previewImageFrame} />
+                  </Pressable>
+                  <Pressable onPress={() => handleSimulateGallery(q.key)} style={ds.removeImageBadge}>
+                    <Text style={{ color: '#fff', fontSize: 10 }}>Remove</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              <TextInput
+                style={ds.minimalTextArea}
+                multiline
+                scrollEnabled={false}
+                value={localDream[q.key] || ''}
+                onChangeText={(text) => updateQuestion(q.key, text)}
+                placeholder="Tap to express your vision..."
+                placeholderTextColor="rgba(255,255,255,0.2)"
+              />
+            </View>
+          ))}
+        </View>
       </ScrollView>
+
+      {/* Save Button Floating Above Navigation Layout (Less Wide Capsule Style) */}
+      {isEditing && (
+        <View style={[ds.floatingSaveButtonContainer, { bottom: Math.max(insets.bottom + 65, 80) }]}>
+          <Pressable 
+            style={({ pressed }) => [ds.floatingWhiteSaveButton, { opacity: pressed ? 0.9 : 1 }]}
+            onPress={handleSaveButtonPress}
+          >
+            <Text style={ds.floatingSaveButtonText}>Save</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Image Gallery Modal */}
+      <Modal visible={!!selectedImage} transparent animationType="fade">
+        <View style={ds.modalLightBox}>
+          <Pressable style={ds.modalCloseBtn} onPress={() => setSelectedImage(null)}><X size={26} color="#ffffff" /></Pressable>
+          {selectedImage && <Image source={{ uri: selectedImage }} style={ds.modalFullImage} />}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 // ==========================================
-// CORE COMPONENT ROOT EXPORT ENTRYPOINT
+// SUB-COMPONENT: AI CHAT SCREEN
+// ==========================================
+function AiChatView({ onBack }) {
+  const insets = useSafeAreaInsets();
+  const [messages, setMessages] = useState([
+    { id: '1', text: 'Hello! I am your AI assistant. Ask me anything about your alignment and goals.', sender: 'ai' }
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  
+  const mockAiResponses = [
+    "That sounds amazing! How does that connect back to your core mindset metrics?",
+    "Fascinating perspective. Let's make sure this aligns heavily with your 1-year goals.",
+    "Consistency is key. What is the single highest leverage action you can perform tomorrow?",
+    "I've updated your focus trajectory. Remember to track your body care alongside this.",
+    "Understood. Let's optimize this strategy to save you mental energy."
+  ];
+
+  const handleSendMessage = () => {
+    if (!inputText.trim()) return;
+    const userMsg = { id: Date.now().toString(), text: inputText, sender: 'user' };
+    setMessages(prev => [...prev, userMsg]);
+    setInputText('');
+    setTimeout(() => {
+      const randomResponse = mockAiResponses[Math.floor(Math.random() * mockAiResponses.length)];
+      const aiMsg = { id: (Date.now() + 1).toString(), text: randomResponse, sender: 'ai' };
+      setMessages(prev => [...prev, aiMsg]);
+    }, 800);
+  };
+
+  return (
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={{ flex: 1, backgroundColor: '#000000' }}
+    >
+      <StatusBar style="light" />
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <Image 
+          source={require('../../../assets/images/blurs/top.png')} 
+          style={{ width: width * 1.1, height: height * 0.3, position: 'absolute', top: -20, left: -width * 0.05, resizeMode: 'stretch', opacity: 0.8 }} 
+        />
+        <Image 
+          source={require('../../../assets/images/blurs/bubble.png')} 
+          style={{ width: width * 1.1, height: height * 0.4, position: 'absolute', bottom: -30, left: -width * 0.05, resizeMode: 'stretch', opacity: 0.8 }} 
+        />
+      </View>
+      <View style={{ paddingTop: insets.top + 10, paddingHorizontal: 24, height: insets.top + 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
+        <Pressable onPress={onBack} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}>
+          <ArrowLeft size={24} color="#ffffff" />
+        </Pressable>
+        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '500' }}>AI Assistant</Text>
+        <Pressable onPress={() => setModalVisible(true)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}>
+          <List size={24} color="#ffffff" />
+        </Pressable>
+      </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: insets.bottom + 90 }} showsVerticalScrollIndicator={false}>
+        {messages.map(m => (
+          <View key={m.id} style={[chatStyles.messageBubble, m.sender === 'user' ? chatStyles.userBubble : chatStyles.aiBubble]}>
+            <Text style={{ color: '#fff', fontSize: 15, lineHeight: 20 }}>{m.text}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      <View style={[chatStyles.stickyInputWrapper, { bottom: Math.max(insets.bottom, 16) }]}>
+        <View style={chatStyles.inputContainer}>
+          <TextInput style={chatStyles.textInput} value={inputText} onChangeText={setInputText} placeholder="Continue conversation..." placeholderTextColor="rgba(255,255,255,0.4)" />
+          <Pressable onPress={handleSendMessage} style={chatStyles.sendBtn}><ArrowUp size={20} color="#000" strokeWidth={2.5} /></Pressable>
+        </View>
+      </View>
+      <Modal visible={modalVisible} transparent={false} animationType="slide">
+        <View style={chatStyles.modalContainer}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 60, marginBottom: 20 }}>
+            <View style={{ width: 24 }} /> <Text style={{ color: '#fff', fontSize: 18, fontWeight: '500' }}>Conversations</Text>
+            <Pressable onPress={() => setModalVisible(false)}><X size={24} color="#ffffff" /></Pressable>
+          </View>
+          <ScrollView><View style={chatStyles.historyCard}><Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Current Alignment Coaching</Text><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4 }}>Active Session</Text></View></ScrollView>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
+  );
+}
+
+// ==========================================
+// SUB-COMPONENT: ADD REVIEW VIEW
+// ==========================================
+function AddReviewView({ onSave, onBack }) {
+  const insets = useSafeAreaInsets();
+  const [answers, setAnswers] = useState({ alignment: '', bodyCare: '', mindset: '', goalsProgress: '', nextWeekPriority: '' });
+  const HEADER_HEIGHT = insets.top + 60;
+  const holdAnim = useRef(new Animated.Value(0)).current;
+  const timerRef = useRef(null);
+  const fields = [
+    { key: 'alignment', label: 'How aligned were your actions with your future self this week?' },
+    { key: 'bodyCare', label: 'How did you take care of your body this week?' },
+    { key: 'mindset', label: 'How was your mindset this week?' },
+    { key: 'goalsProgress', label: 'How much did your work or studies move you closer to your goals?' },
+    { key: 'nextWeekPriority', label: 'What\'s the single most important thing you\'ll do next week?' }
+  ];
+  const handlePressIn = () => {
+    Animated.timing(holdAnim, { toValue: 1, duration: 5000, useNativeDriver: false }).start();
+    timerRef.current = setTimeout(() => { onSave(answers); }, 5000);
+  };
+  const handlePressOut = () => {
+    clearTimeout(timerRef.current);
+    Animated.timing(holdAnim, { toValue: 0, duration: 250, useNativeDriver: false }).start();
+  };
+  const progressBgColor = holdAnim.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 1)'] });
+  const progressIconColor = holdAnim.interpolate({ inputRange: [0, 1], outputRange: ['#ffffff', '#000000'] });
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#020206' }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 }}>
+        <View style={{ height: HEADER_HEIGHT, backgroundColor: '#020206', justifyContent: 'flex-end', paddingBottom: 14, paddingHorizontal: 24 }}><Pressable onPress={onBack}><ArrowLeft size={24} color="#ffffff" /></Pressable></View>
+      </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: HEADER_HEIGHT + 20, paddingBottom: insets.bottom + 170 }} showsVerticalScrollIndicator={false}>
+        {fields.map((f) => (
+          <View key={f.key} style={{ marginBottom: 36 }}><Text style={s.pageFieldTitle}>{f.label}</Text><TextInput style={s.pageFieldBottomLineInput} multiline scrollEnabled={false} placeholder="Type your reflection here..." placeholderTextColor="rgba(255,255,255,0.25)" value={answers[f.key]} onChangeText={t => setAnswers(p => ({ ...p, [f.key]: t }))} /></View>
+        ))}
+      </ScrollView>
+      <View style={{ position: 'absolute', bottom: insets.bottom + 90, left: 16, right: 16, zIndex: 10, alignItems: 'center' }}>
+        <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={s.roundSaveArrowBtn}><Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: progressBgColor }]} /><ArrowUp size={24} strokeWidth={2.5} color={progressIconColor} /></Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ==========================================
+// CORE ROOT COMPONENT: JOURNALSCREEN
 // ==========================================
 export default function JournalScreen() {
   const insets = useSafeAreaInsets();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [reviewModalVisible, setReviewModalVisible] = useState(false);
-  const [dreamText, setDreamText] = useState('');
-  const [viewingDream, setViewingDream] = useState(false);
-  const [answers, setAnswers] = useState({ habits: '', health: '', financial: '', relationships: '' });
+  const [viewingAddReview, setViewingAddReview] = useState(false);
+  const [dreamData, setDreamData] = useState({});
+  const [viewingDream, setViewingDream] = useState(true); 
   const [activeTab, setActiveTab] = useState('health');
 
   useEffect(() => {
     const load = async () => {
       try {
         const sd = await AsyncStorage.getItem(DREAM_KEY);
-        if (sd) setDreamText(sd);
+        if (sd) setDreamData(JSON.parse(sd));
         const sr = await AsyncStorage.getItem(REVIEWS_KEY);
         if (sr) setReviews(JSON.parse(sr));
       } catch (e) { console.error(e); }
@@ -149,11 +409,8 @@ export default function JournalScreen() {
     load();
   }, []);
 
-  const { metrics, trends, changes } = useMemo(() => {
+  const { metrics } = useMemo(() => {
     const base = { health: 65, mindset: 48, career: 72, relationships: 85 };
-    const calculatedTrends = { health: 'up', mindset: 'down', career: 'up', relationships: 'stable' };
-    const lastChanges = { health: 4, mindset: -2, career: 5, relationships: 0 };
-    
     if (reviews.length > 0) {
       reviews.forEach(r => {
         if (r.metricsChanged) {
@@ -164,274 +421,133 @@ export default function JournalScreen() {
         }
       });
     }
-    return { metrics: base, trends: calculatedTrends, changes: lastChanges };
+    return { metrics: base };
   }, [reviews]);
 
-  const handleSaveDream = async (newText) => {
-    setDreamText(newText);
-    await AsyncStorage.setItem(DREAM_KEY, newText);
+  const handleSaveDream = async (newData) => {
+    setDreamData(newData);
+    await AsyncStorage.setItem(DREAM_KEY, JSON.stringify(newData));
   };
 
-  const analyzeWeeklyInput = (a) => {
-    const t = Object.values(a).join(' ').toLowerCase();
-    const c = { health: 0, mindset: 0, career: 0, relationships: 0 };
-    c.health = (t.includes('sleep') || t.includes('water') || t.includes('gym')) ? Math.floor(Math.random() * 3) + 1 : (Math.random() > 0.5 ? 0 : -1);
-    c.career = (t.includes('work') || t.includes('study') || t.includes('code')) ? Math.floor(Math.random() * 3) + 1 : (Math.random() > 0.5 ? 0 : -1);
-    c.relationships = (t.includes('friend') || t.includes('family') || t.includes('partner')) ? Math.floor(Math.random() * 3) + 1 : (Math.random() > 0.5 ? 0 : -1);
-    
-    let mi = 1;
-    ['good', 'great', 'happy', 'focus', 'discipline'].forEach(w => { if (t.includes(w)) mi++; });
-    c.mindset = mi;
-    return c;
-  };
-
-  const submitReview = async () => {
-    if (!answers.habits || !answers.health || !answers.financial || !answers.relationships) { alert('Please fill in all review sections.'); return; }
-    let calculatedTitle = 'Weekly Review';
-    if (answers.health && !answers.habits && !answers.financial) calculatedTitle = 'Health & Wellbeing';
-    else if (answers.financial && !answers.health) calculatedTitle = 'Career Expansion';
-
-    const entry = { id: Date.now().toString(), date: new Date().toISOString().split('T')[0], title: calculatedTitle, answers: { ...answers }, metricsChanged: analyzeWeeklyInput(answers) };
+  const handleCreateReview = async (submittedAnswers) => {
+    if (!submittedAnswers.alignment || !submittedAnswers.bodyCare || !submittedAnswers.mindset) { 
+      alert('Please fill out the primary review questions.'); 
+      return; 
+    }
+    const entry = { id: Date.now().toString(), date: new Date().toISOString().split('T')[0], title: 'Weekly Alignment Log', answers: { ...submittedAnswers }, metricsChanged: { health: 1 } };
     const updated = [...reviews, entry];
     setReviews(updated);
     await AsyncStorage.setItem(REVIEWS_KEY, JSON.stringify(updated));
-    setAnswers({ habits: '', health: '', financial: '', relationships: '' });
-    setReviewModalVisible(false);
+    setViewingAddReview(false);
   };
 
-  if (viewingDream) {
-    return (
-      <DreamView 
-        metrics={metrics} 
-        dreamText={dreamText} 
-        onSaveDream={handleSaveDream} 
-        onBack={() => setViewingDream(false)} 
-      />
-    );
-  }
-
-  const FIELDS = [
-    ['habits', 'Habits & Routine', 'What routines did you uphold?'],
-    ['health', 'Health & Vigor', 'How was sleep, nutrition, and exercise?'],
-    ['financial', 'Finance & Security', 'What were your financial decisions?'],
-    ['relationships', 'Connections & Relations', 'How are relations with friends/family?'],
-  ];
+  if (viewingDream) return <DreamView metrics={metrics} dreamData={dreamData} onSaveDream={handleSaveDream} onBack={() => setViewingDream(false)} />;
+  if (viewingAddReview) return <AddReviewView onSave={handleCreateReview} onBack={() => setViewingAddReview(false)} />;
 
   const MAIN_TABS = [
     { id: 'health', label: 'Health', icon: require('../../../assets/images/icons/health.png') },
     { id: 'career', label: 'Career', icon: require('../../../assets/images/icons/career.png') },
     { id: 'relationships', label: 'Relationships', icon: require('../../../assets/images/icons/relationships.png') },
   ];
-
   const renderProgressBar = (labelName, valueKey) => {
     const value = metrics[valueKey];
-    const change = changes[valueKey];
-    const trend = trends[valueKey];
-    const arrow = trend === 'up' ? ' ↑' : trend === 'down' ? ' ↓' : '';
-    const changeText = change !== 0 ? ` (${change > 0 ? '+' : ''}${change}%)` : '';
-    const trendColor = change > 0 ? '#0ac378' : change < 0 ? '#ff503c' : 'rgba(255,255,255,0.3)';
-
     return (
-      <View key={valueKey} style={{ marginBottom: 20, width: '100%' }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '500' }}>{labelName}</Text>
-          <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '400' }}>
-            {value}%<Text style={{ fontSize: 13, color: trendColor }}>{arrow}{changeText}</Text>
-          </Text>
-        </View>
-        <View style={{ height: 4, backgroundColor: '#333339', borderRadius: 2, width: '100%', overflow: 'hidden' }}>
-          <View style={{ height: '100%', width: `${value}%`, backgroundColor: '#ffffff', borderRadius: 2 }} />
-        </View>
-      </View>
-    );
-  };
-
-  // Helper inside loop to extract the first significant metric change tag
-  const renderTrendTag = (metricsChanged) => {
-    if (!metricsChanged) return null;
-    const items = Object.entries(metricsChanged);
-    const primary = items.find(([_, val]) => val !== 0) || items[0];
-    if (!primary || primary[1] === 0) return null;
-
-    const [key, val] = primary;
-    const isUp = val > 0;
-    const displayLabel = key.charAt(0).toUpperCase() + key.slice(1);
-    
-    return (
-      <View style={[tl.tagContainer, { backgroundColor: isUp ? 'rgba(10,195,120,0.08)' : 'rgba(255,80,60,0.08)' }]}>
-        <Text style={[tl.tagText, { color: isUp ? '#0ac378' : '#ff503c' }]}>
-          {isUp ? '▲' : '▼'} {isUp ? '+' : ''}{val}% {displayLabel}
-        </Text>
-      </View>
+      <View key={valueKey} style={{ marginBottom: 20 }}><View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}><Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>{labelName}</Text><Text style={{ color: '#ffffff', fontSize: 16 }}>{value}%</Text></View><View style={{ height: 4, backgroundColor: '#333339', borderRadius: 2 }}><View style={{ height: '100%', width: `${value}%`, backgroundColor: '#ffffff', borderRadius: 2 }} /></View></View>
     );
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#020206' }}>
       <StatusBar style="light" />
-      {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-        </View>
+      {loading ? (<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color="#FFFFFF" /></View>
       ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-          <View style={{ alignItems: 'center', marginBottom: 36, position: 'relative', width: '100%' }}>
-            <View style={{ position: 'absolute', left: 0, top: 0, zIndex: 10 }}>
-              <Pressable onPress={() => setViewingDream(true)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' })}>
-                <Sparkles size={15} color="#ffffff" />
-              </Pressable>
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '400', color: '#ffffff', letterSpacing: 0.5, paddingTop: 6 }}>Review</Text>
-            <View style={{ position: 'absolute', right: 0, top: 0, zIndex: 10 }}>
-              <Pressable onPress={() => setReviewModalVisible(true)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' })}>
-                <Plus size={16} color="#ffffff" />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={{ marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              {MAIN_TABS.map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1, paddingVertical: 12, position: 'relative', opacity: isActive ? 1 : 0.4 }}>
-                    <Image 
-                      source={tab.icon} 
-                      style={{ width: 80, height: 80, marginBottom: 8, resizeMode: 'contain' }} 
-                    />
-                    <Text style={{ fontSize: 27, fontWeight: '500', color: '#ffffff' }}>{metrics[tab.id]}%</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#ffffff', marginTop: 4, letterSpacing: 1.3 }}>{tab.label.toUpperCase()}</Text>
-                    {isActive && <View style={{ position: 'absolute', bottom: 0, left: 16, right: 16, height: 2, backgroundColor: '#ffffff' }} />}
-                  </Pressable>
-                );
-              })}
-            </View>
-            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)', width: '100%', marginBottom: 28 }} />
-            <View style={{ paddingHorizontal: 4 }}>
-              {activeTab === 'health' && [renderProgressBar('Health', 'health'), renderProgressBar('Mindset', 'mindset')]}
-              {activeTab === 'career' && renderProgressBar('Career', 'career')}
-              {activeTab === 'relationships' && renderProgressBar('Relationships', 'relationships')}
-            </View>
-          </View>
-
-          {/* GENERATED CONTENT MARGIN SEPARATOR BUFFER */}
-          <View style={{ marginTop: 32, gap: 0 }}>
-            {reviews.length === 0 ? (
-              <View style={{ paddingVertical: 52, alignItems: 'center' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 14, textAlign: 'center' }}>{'No logs yet.\nTap + to write your first weekly review.'}</Text>
-              </View>
-            ) : (
-              [...reviews].reverse().map((item, idx, reversedArr) => {
-                const isFirst = idx === 0;
-                const isLast = idx === reversedArr.length - 1;
-
-                return (
-                  <View key={item.id} style={tl.rowItem}>
-                    {/* ACCURATE INDEPENDENT TIMELINE CONNECTOR LINE AXIS COMPONENTS */}
-                    <View style={tl.axisColumn}>
-                      <View style={[tl.lineSegment, { backgroundColor: isFirst ? 'transparent' : 'rgba(255,255,255,0.1)' }]} />
-                      <View style={tl.cleanDotNode} />
-                      <View style={[tl.lineSegment, { backgroundColor: isLast ? 'transparent' : 'rgba(255,255,255,0.1)' }]} />
-                    </View>
-
-                    {/* MAIN EXPANDED CONTENT DATA AREA WITH CORNER PROGRESS CHIP TAGS */}
-                    <View style={tl.bodyCard}>
-                      <View style={tl.cardHeaderGroup}>
-                        <View style={{ flex: 1, paddingRight: 8 }}>
-                          <Text style={{ color: '#ffffff', fontSize: 17, fontWeight: '700', marginBottom: 3 }} numberOfLines={1}>{item.title}</Text>
-                          <Text style={{ color: 'rgba(255,255,255,0.28)', fontSize: 11 }}>{formatDate(item.date)}</Text>
-                        </View>
-                        {renderTrendTag(item.metricsChanged)}
-                      </View>
-                      
-                      <View style={{ gap: 6, marginTop: 12 }}>
-                        {Object.entries(item.answers).map(([k, v]) => v ? (
-                          <Text key={k} style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
-                            <Text style={{ color: 'rgba(255,255,255,0.65)', fontWeight: '600' }}>{k}: </Text>
-                            {v}
-                          </Text>
-                        ) : null)}
-                      </View>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </View>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 24, paddingBottom: 120 }}>
+          <View style={{ alignItems: 'center', marginBottom: 36 }}><Pressable onPress={() => setViewingDream(true)} style={{ position: 'absolute', left: 0, top: 0, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' }}><Sparkles size={15} color="#ffffff" /></Pressable><Text style={{ fontSize: 18, color: '#ffffff', paddingTop: 6 }}>Review</Text><Pressable onPress={() => setViewingAddReview(true)} style={{ position: 'absolute', right: 0, top: 0, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' }}><Plus size={16} color="#ffffff" /></Pressable></View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 }}>{MAIN_TABS.map((tab) => (<Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1, opacity: activeTab === tab.id ? 1 : 0.4 }}><Image source={tab.icon} style={{ width: 68, height: 68, marginBottom: 10, resizeMode: 'contain' }} /><Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{tab.label}</Text><Text style={{ fontSize: 24, color: '#ffffff', fontWeight: '600' }}>{metrics[tab.id]}%</Text></Pressable>))}</View>
+          <View style={{ marginBottom: 40 }}>{activeTab === 'health' ? [renderProgressBar('Health', 'health'), renderProgressBar('Mindset', 'mindset')] : renderProgressBar(activeTab.charAt(0).toUpperCase() + activeTab.slice(1), activeTab)}</View>
+          <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600', marginBottom: 20 }}>Weekly Review Timeline</Text>
+          {reviews.map((rev) => (<View key={rev.id} style={tl.rowItem}><View style={tl.axisColumn}><View style={[tl.lineSegment, { backgroundColor: 'rgba(255,255,255,0.1)' }]} /><View style={tl.cleanDotNode} /></View><View style={tl.bodyCard}><Text style={{ color: '#ffffff', fontSize: 16 }}>{rev.title}</Text><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>{formatDate(rev.date)}</Text></View></View>))}
         </ScrollView>
       )}
-
-      {/* WEEKLY LOG MODAL */}
-      <Modal visible={reviewModalVisible} transparent animationType="fade" statusBarTranslucent>
-        <TouchableWithoutFeedback onPress={() => setReviewModalVisible(false)}>
-          <View style={s.modalBg}>
-            <TouchableWithoutFeedback>
-              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.modalWrapper}>
-                <View style={s.modalContent}>
-                  <View style={s.modalHeader}><Plus size={16} color="#ffffff" /><Text style={s.modalTitle}>Weekly Log</Text></View>
-                  <ScrollView style={{ maxHeight: height * 0.45 }} showsVerticalScrollIndicator={false}>
-                    <View style={{ gap: 14, paddingBottom: 10 }}>
-                      {FIELDS.map(([key, label, ph]) => (
-                        <View key={key}>
-                          <Text style={s.fieldLabel}>{label}</Text>
-                          <TextInput style={s.fieldInput} placeholder={ph} placeholderTextColor="rgba(255,255,255,0.25)" value={answers[key]} onChangeText={t => setAnswers(p => ({ ...p, [key]: t }))} />
-                        </View>
-                      ))}
-                    </View>
-                  </ScrollView>
-                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 18 }}>
-                    <Pressable onPress={() => setReviewModalVisible(false)} style={s.cancelBtn}><Text style={{ color: '#fff', fontSize: 13 }}>Cancel</Text></Pressable>
-                    <Pressable onPress={submitReview} style={s.saveBtn}><Text style={{ color: '#000', fontSize: 13, fontWeight: '700' }}>Save Log</Text></Pressable>
-                  </View>
-                </View>
-              </KeyboardAvoidingView>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
     </View>
   );
 }
 
 // ==========================================
-// CORE STYLESHEETS
+// CONSOLIDATED STYLESHEETS
 // ==========================================
+const ds = StyleSheet.create({
+  topBlurBackground: { width: width * 1.1, height: height * 0.35, position: 'absolute', top: -20, left: -width * 0.05, resizeMode: 'stretch', opacity: 0.6 },
+  headerTitle: { color: '#ffffff', fontSize: 16, fontWeight: '600', flex: 1, textAlign: 'center' },
+  metricsCardContainer: {
+    backgroundColor: '#0A0A0A', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 16,
+    paddingVertical: 50, paddingHorizontal: 16, marginBottom: 16, alignItems: 'center', width: '100%'
+  },
+  gaugeContainer: { height: 165, alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%', marginTop: 15 },
+  ticksWrapper: { position: 'absolute', width: 270, height: 270, alignItems: 'center', justifyContent: 'center', top: -35 },
+  tickLine: { position: 'absolute', width: 1.5, borderRadius: 1 }, 
+  scoreOverlay: { alignItems: 'center', justifyContent: 'center', top: 5 },
+  hugeScore: { color: '#ffffff', fontSize: 79, fontWeight: '500', letterSpacing: -1, lineHeight: 74, marginBottom: 0 }, 
+  inRangeTag: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 12, marginTop: -2, marginBottom: 2 },
+  scoreLabel: { color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textAlign: 'center', marginTop: 4 },
+  dateSubText: { color: 'rgba(255, 255, 255, 0.3)', fontSize: 11, marginTop: 2 },
+  horizontalDivider: { width: '100%', height: 1, backgroundColor: 'rgba(255, 255, 255, 0.06)', marginVertical: 20 },
+  subMetricsRow: { flexDirection: 'row', width: '100%', justifyContent: 'space-around', paddingHorizontal: 10 },
+  subMetricItem: { alignItems: 'center' },
+  subMetricLabel: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 13, marginBottom: 6 },
+  subMetricValue: { color: '#ffffff', fontSize: 20, fontWeight: '500' },
+  recapCardContainer: {
+    backgroundColor: '#0a0a0c', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 16,
+    padding: 20, marginBottom: 36, width: '100%'
+  },
+  recapHeader: { color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
+  recapBodyText: { color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 },
+  sectionHeader: { color: '#ffffff', fontSize: 16, fontWeight: '600', marginBottom: 16 },
+  contributorRow: {
+    height: 38, width: '100%', backgroundColor: 'transparent', borderRadius: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4,
+    overflow: 'hidden'
+  },
+  behindFillTrack: { position: 'absolute', top: 0, left: 0, bottom: 0, opacity: 0.7, borderRadius: 4 },
+  contributorLabel: { color: '#ffffff', fontSize: 14, fontWeight: '500', zIndex: 1 },
+  contributorValue: { color: 'rgba(255,255,255,0.6)', fontSize: 14, zIndex: 1 },
+  questionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
+  questionLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: '500', lineHeight: 20, flex: 1, paddingRight: 16 },
+  inlineImagePicker: { padding: 4 },
+  squareImagePreviewContainer: { width: '100%', height: 180, borderRadius: 12, overflow: 'hidden', marginBottom: 12, position: 'relative' },
+  previewImageFrame: { width: '100%', height: '100%', resizeMode: 'cover' },
+  removeImageBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, borderRadius: 12 },
+  minimalTextArea: { color: '#ffffff', fontSize: 15, lineHeight: 22, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', paddingVertical: 8, minHeight: 36, textAlignVertical: 'top' },
+  floatingSaveButtonContainer: { position: 'absolute', left: 0, right: 0, zIndex: 9999, alignItems: 'center' },
+  floatingWhiteSaveButton: { backgroundColor: '#ffffff', width: 140, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 6 },
+  floatingSaveButtonText: { color: '#000000', fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
+  modalLightBox: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  modalCloseBtn: { position: 'absolute', top: 40, right: 24, zIndex: 10 },
+  modalFullImage: { width: width, height: height * 0.7, resizeMode: 'contain' }
+});
+
+const chatStyles = StyleSheet.create({
+  messageBubble: { maxWidth: '80%', padding: 14, borderRadius: 20, marginBottom: 14 },
+  userBubble: { backgroundColor: 'rgba(255, 255, 255, 0.15)', alignSelf: 'flex-end', borderBottomRightRadius: 4 },
+  aiBubble: { backgroundColor: 'rgba(255, 255, 255, 0.06)', alignSelf: 'flex-start', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)' },
+  stickyInputWrapper: { position: 'absolute', left: 0, right: 0, paddingHorizontal: 20, backgroundColor: 'transparent', zIndex: 9999 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgb(30, 30, 32)', borderRadius: 28, paddingHorizontal: 16, height: 54, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.15)' },
+  textInput: { flex: 1, color: '#ffffff', fontSize: 15, paddingVertical: 10, height: '100%' },
+  sendBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
+  modalContainer: { flex: 1, backgroundColor: '#000000', paddingTop: 40, paddingHorizontal: 24 },
+  historyCard: { backgroundColor: 'rgba(255,255,255,0.05)', padding: 16, borderRadius: 14, marginBottom: 12 }
+});
+
 const s = StyleSheet.create({
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
-  modalWrapper: { width: '90%', maxWidth: 400 },
-  modalContent: { borderRadius: 24, padding: 22, backgroundColor: '#0d0d16' },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  modalTitle: { color: '#fff', fontSize: 15, fontWeight: '700', textTransform: 'uppercase' },
-  fieldLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', marginBottom: 4 },
-  fieldInput: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, paddingHorizontal: 12, height: 38, color: '#fff', fontSize: 12 },
-  cancelBtn: { flex: 1, height: 42, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
-  saveBtn: { flex: 1.5, height: 42, borderRadius: 12, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' },
+  roundSaveArrowBtn: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, borderColor: '#ffffff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  pageFieldTitle: { color: '#ffffff', fontSize: 20, fontWeight: '600', marginBottom: 14 },
+  pageFieldBottomLineInput: { backgroundColor: 'transparent', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.2)', paddingVertical: 8, color: '#fff', fontSize: 16 },
 });
 
 const tl = StyleSheet.create({
-  rowItem: { flexDirection: 'row', width: '100%', minHeight: 90 },
-  axisColumn: { width: 16, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  rowItem: { flexDirection: 'row', minHeight: 60, marginBottom: 10 },
+  axisColumn: { width: 16, alignItems: 'center', justifyContent: 'center' },
   lineSegment: { flex: 1, width: 1 },
-  cleanDotNode: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: 'rgba(255,255,255,0.45)', marginVertical: 4 },
-  bodyCard: { flex: 1, paddingLeft: 16, paddingBottom: 24, paddingTop: 2 },
-  cardHeaderGroup: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' },
-  tagContainer: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  tagText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.2 }
-});
-
-const ds = StyleSheet.create({
-  gaugeContainer: { height: 160, alignItems: 'center', justifyContent: 'center', marginTop: 24, position: 'relative', width: '100%' },
-  ticksWrapper: { position: 'absolute', width: 260, height: 260, alignItems: 'center', justifyContent: 'center', top: -35 },
-  tickLine: { position: 'absolute', width: 2.5, height: 10, borderRadius: 1 },
-  scoreOverlay: { alignItems: 'center', justifyContent: 'center', position: 'absolute', top: 35 },
-  hugeScore: { color: '#ffffff', fontSize: 52, fontWeight: '800', letterSpacing: -0.5 },
-  scoreLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', textTransform: 'capitalize', marginTop: -4 },
-  statusText: { color: '#ffffff', fontSize: 16, fontWeight: '600', marginTop: 12 },
-  descriptionParagraph: { color: 'rgba(255,255,255,0.65)', fontSize: 14, textAlign: 'center', lineHeight: 22, paddingHorizontal: 12, marginBottom: 36, marginTop: 24 },
-  sectionHeader: { color: '#ffffff', fontSize: 15, fontWeight: '600', marginBottom: 12, paddingHorizontal: 4 },
-  contributorRow: { height: 28, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, position: 'relative', overflow: 'hidden', borderRadius: 6 },
-  behindFillTrack: { position: 'absolute', top: 0, bottom: 0, left: 0 },
-  contributorLabel: { color: '#ffffff', fontSize: 13, fontWeight: '400' },
-  contributorValue: { color: '#ffffff', fontSize: 13, fontWeight: '500' },
-  pureTextArea: { color: '#ffffff', fontSize: 14, lineHeight: 22, paddingHorizontal: 4, paddingTop: 4, minHeight: 100, textAlignVertical: 'top', backgroundColor: 'transparent' }
+  cleanDotNode: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.6)' },
+  bodyCard: { flex: 1, paddingLeft: 20, paddingBottom: 10 },
 });
