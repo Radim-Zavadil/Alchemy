@@ -2,7 +2,7 @@
 import {
   View, Text, Pressable, Dimensions, ScrollView, TextInput,
   KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator, Image,
-  Modal, Animated,
+  Modal, Animated, Keyboard,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 const REVIEWS_KEY = 'alchemy_reviews';
-const DREAM_KEY = 'alchemy_user_dream_v3'; 
+const DREAM_KEY = 'alchemy_user_dream_v3';
 
 const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -26,7 +26,7 @@ function DreamView({ metrics, dreamData, onSaveDream, onBack }) {
   const [viewingAiChat, setViewingAiChat] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   const HEADER_HEIGHT = insets.top + 50;
 
   // Question handlers
@@ -60,7 +60,7 @@ function DreamView({ metrics, dreamData, onSaveDream, onBack }) {
     return Math.round(total);
   }, [metrics]);
 
-  const totalTicks = 85; 
+  const totalTicks = 85;
   const activeTicksThreshold = Math.round((overallScore / 100) * totalTicks);
 
   const contributors = [
@@ -100,21 +100,21 @@ function DreamView({ metrics, dreamData, onSaveDream, onBack }) {
   }
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1, backgroundColor: '#000000' }}
     >
       <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-        <Image 
-          source={require('../../../assets/images/blurs/top.png')} 
-          style={ds.topBlurBackground} 
+        <Image
+          source={require('../../../assets/images/blurs/top.png')}
+          style={ds.topBlurBackground}
         />
       </View>
 
-      <ScrollView 
-        style={{ flex: 1 }} 
-        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: insets.top + 10, paddingBottom: 140 }} 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 12, paddingTop: insets.top + 10, paddingBottom: 140 }}
+        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* Scrollable, Non-Sticky Custom Header */}
@@ -127,7 +127,7 @@ function DreamView({ metrics, dreamData, onSaveDream, onBack }) {
             <MessageSquare size={20} color="#ffffff" />
           </Pressable>
         </View>
-        
+
         {/* Main Performance Metric Gauge Box */}
         <View style={ds.metricsCardContainer}>
           <View style={ds.gaugeContainer}>
@@ -136,16 +136,16 @@ function DreamView({ metrics, dreamData, onSaveDream, onBack }) {
                 const rotation = -90 + (i * (180 / (totalTicks - 1)));
                 const isActive = i <= activeTicksThreshold;
                 return (
-                  <View 
-                    key={i} 
+                  <View
+                    key={i}
                     style={[
-                      ds.tickLine, 
-                      { 
-                        transform: [{ rotate: `${rotation}deg` }, { translateY: -125 }], 
+                      ds.tickLine,
+                      {
+                        transform: [{ rotate: `${rotation}deg` }, { translateY: -125 }],
                         backgroundColor: isActive ? '#dcdcdc' : 'rgba(240, 240, 240, 0.18)',
                         height: 12
                       }
-                    ]} 
+                    ]}
                   />
                 );
               })}
@@ -197,7 +197,7 @@ function DreamView({ metrics, dreamData, onSaveDream, onBack }) {
         </View>
 
         <Text style={[ds.sectionHeader, { marginBottom: 24, fontSize: 18, paddingHorizontal: 12 }]}>Dream Vision Blueprint</Text>
-        
+
         <View style={{ paddingHorizontal: 12 }}>
           {DREAM_QUESTIONS.map((q) => (
             <View key={q.key} style={{ marginBottom: 36 }}>
@@ -238,7 +238,7 @@ function DreamView({ metrics, dreamData, onSaveDream, onBack }) {
       {/* Save Button Floating Above Navigation Layout (Less Wide Capsule Style) */}
       {isEditing && (
         <View style={[ds.floatingSaveButtonContainer, { bottom: Math.max(insets.bottom + 65, 80) }]}>
-          <Pressable 
+          <Pressable
             style={({ pressed }) => [ds.floatingWhiteSaveButton, { opacity: pressed ? 0.9 : 1 }]}
             onPress={handleSaveButtonPress}
           >
@@ -268,7 +268,23 @@ function AiChatView({ onBack }) {
   ]);
   const [inputText, setInputText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
-  
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const mockAiResponses = [
     "That sounds amazing! How does that connect back to your core mindset metrics?",
     "Fascinating perspective. Let's make sure this aligns heavily with your 1-year goals.",
@@ -290,19 +306,19 @@ function AiChatView({ onBack }) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1, backgroundColor: '#000000' }}
     >
       <StatusBar style="light" />
       <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-        <Image 
-          source={require('../../../assets/images/blurs/top.png')} 
-          style={{ width: width * 1.1, height: height * 0.3, position: 'absolute', top: -20, left: -width * 0.05, resizeMode: 'stretch', opacity: 0.8 }} 
+        <Image
+          source={require('../../../assets/images/blurs/top.png')}
+          style={{ width: width * 1.1, height: height * 0.3, position: 'absolute', top: -20, left: -width * 0.05, resizeMode: 'stretch', opacity: 0.8 }}
         />
-        <Image 
-          source={require('../../../assets/images/blurs/bubble.png')} 
-          style={{ width: width * 1.1, height: height * 0.4, position: 'absolute', bottom: -30, left: -width * 0.05, resizeMode: 'stretch', opacity: 0.8 }} 
+        <Image
+          source={require('../../../assets/images/blurs/bubble.png')}
+          style={{ width: width * 1.1, height: height * 0.4, position: 'absolute', bottom: -30, left: -width * 0.05, resizeMode: 'stretch', opacity: 0.8 }}
         />
       </View>
       <View style={{ paddingTop: insets.top + 10, paddingHorizontal: 24, height: insets.top + 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
@@ -314,14 +330,14 @@ function AiChatView({ onBack }) {
           <List size={24} color="#ffffff" />
         </Pressable>
       </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: insets.bottom + 90 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: keyboardVisible ? 80 : (tabBarHeight + 80) }} showsVerticalScrollIndicator={false}>
         {messages.map(m => (
           <View key={m.id} style={[chatStyles.messageBubble, m.sender === 'user' ? chatStyles.userBubble : chatStyles.aiBubble]}>
             <Text style={{ color: '#fff', fontSize: 15, lineHeight: 20 }}>{m.text}</Text>
           </View>
         ))}
       </ScrollView>
-      <View style={[chatStyles.stickyInputWrapper, { bottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[chatStyles.stickyInputWrapper, { bottom: keyboardVisible ? 8 : (tabBarHeight + 8) }]}>
         <View style={chatStyles.inputContainer}>
           <TextInput style={chatStyles.textInput} value={inputText} onChangeText={setInputText} placeholder="Continue conversation..." placeholderTextColor="rgba(255,255,255,0.4)" />
           <Pressable onPress={handleSendMessage} style={chatStyles.sendBtn}><ArrowUp size={20} color="#000" strokeWidth={2.5} /></Pressable>
@@ -340,6 +356,16 @@ function AiChatView({ onBack }) {
   );
 }
 
+const fields = [
+  { key: 'alignment', label: 'How aligned were your actions with your future self this week?' },
+  { key: 'bodyCare', label: 'How did you take care of your body this week?' },
+  { key: 'mindset', label: 'How was your mindset this week?' },
+  { key: 'goalsProgress', label: 'How much did your work or studies move you closer to your goals?' },
+  { key: 'nextWeekPriority', label: 'What\'s the single most important thing you\'ll do next week?' }
+];
+
+const tabBarHeight = Platform.OS === 'ios' ? 92 : 74;
+
 // ==========================================
 // SUB-COMPONENT: ADD REVIEW VIEW
 // ==========================================
@@ -349,13 +375,6 @@ function AddReviewView({ onSave, onBack }) {
   const HEADER_HEIGHT = insets.top + 60;
   const holdAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef(null);
-  const fields = [
-    { key: 'alignment', label: 'How aligned were your actions with your future self this week?' },
-    { key: 'bodyCare', label: 'How did you take care of your body this week?' },
-    { key: 'mindset', label: 'How was your mindset this week?' },
-    { key: 'goalsProgress', label: 'How much did your work or studies move you closer to your goals?' },
-    { key: 'nextWeekPriority', label: 'What\'s the single most important thing you\'ll do next week?' }
-  ];
   const handlePressIn = () => {
     Animated.timing(holdAnim, { toValue: 1, duration: 5000, useNativeDriver: false }).start();
     timerRef.current = setTimeout(() => { onSave(answers); }, 5000);
@@ -393,8 +412,9 @@ export default function JournalScreen() {
   const [loading, setLoading] = useState(true);
   const [viewingAddReview, setViewingAddReview] = useState(false);
   const [dreamData, setDreamData] = useState({});
-  const [viewingDream, setViewingDream] = useState(true); 
+  const [viewingDream, setViewingDream] = useState(false);
   const [activeTab, setActiveTab] = useState('health');
+  const [selectedReview, setSelectedReview] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -430,9 +450,9 @@ export default function JournalScreen() {
   };
 
   const handleCreateReview = async (submittedAnswers) => {
-    if (!submittedAnswers.alignment || !submittedAnswers.bodyCare || !submittedAnswers.mindset) { 
-      alert('Please fill out the primary review questions.'); 
-      return; 
+    if (!submittedAnswers.alignment || !submittedAnswers.bodyCare || !submittedAnswers.mindset) {
+      alert('Please fill out the primary review questions.');
+      return;
     }
     const entry = { id: Date.now().toString(), date: new Date().toISOString().split('T')[0], title: 'Weekly Alignment Log', answers: { ...submittedAnswers }, metricsChanged: { health: 1 } };
     const updated = [...reviews, entry];
@@ -466,9 +486,64 @@ export default function JournalScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 }}>{MAIN_TABS.map((tab) => (<Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} style={{ alignItems: 'center', flex: 1, opacity: activeTab === tab.id ? 1 : 0.4 }}><Image source={tab.icon} style={{ width: 68, height: 68, marginBottom: 10, resizeMode: 'contain' }} /><Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{tab.label}</Text><Text style={{ fontSize: 24, color: '#ffffff', fontWeight: '600' }}>{metrics[tab.id]}%</Text></Pressable>))}</View>
           <View style={{ marginBottom: 40 }}>{activeTab === 'health' ? [renderProgressBar('Health', 'health'), renderProgressBar('Mindset', 'mindset')] : renderProgressBar(activeTab.charAt(0).toUpperCase() + activeTab.slice(1), activeTab)}</View>
           <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600', marginBottom: 20 }}>Weekly Review Timeline</Text>
-          {reviews.map((rev) => (<View key={rev.id} style={tl.rowItem}><View style={tl.axisColumn}><View style={[tl.lineSegment, { backgroundColor: 'rgba(255,255,255,0.1)' }]} /><View style={tl.cleanDotNode} /></View><View style={tl.bodyCard}><Text style={{ color: '#ffffff', fontSize: 16 }}>{rev.title}</Text><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>{formatDate(rev.date)}</Text></View></View>))}
+          {reviews.map((rev) => (
+            <Pressable
+              key={rev.id}
+              onPress={() => setSelectedReview(rev)}
+              style={({ pressed }) => [tl.rowItem, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <View style={tl.axisColumn}>
+                <View style={[tl.lineSegment, { backgroundColor: 'rgba(255,255,255,0.1)' }]} />
+                <View style={tl.cleanDotNode} />
+              </View>
+              <View style={tl.bodyCard}>
+                <Text style={{ color: '#ffffff', fontSize: 16 }}>{rev.title}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>{formatDate(rev.date)}</Text>
+              </View>
+            </Pressable>
+          ))}
         </ScrollView>
       )}
+
+      {/* VIEW REVIEW DETAILS MODAL */}
+      <Modal visible={!!selectedReview} animationType="slide" transparent={false} statusBarTranslucent>
+        <View style={{ flex: 1, backgroundColor: '#020206' }}>
+          <View style={{ height: insets.top + 60, backgroundColor: '#020206', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.05)', paddingTop: insets.top }}>
+            <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '600' }}>Weekly Review Details</Text>
+            <Pressable
+              onPress={() => setSelectedReview(null)}
+              style={({ pressed }) => ({
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: '#2A2A2E',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.75 : 1
+              })}
+            >
+              <X size={20} color="#ffffff" />
+            </Pressable>
+          </View>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: insets.bottom + 40 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 24 }}>
+              {selectedReview ? formatDate(selectedReview.date) : ''}
+            </Text>
+            {selectedReview && fields.map((f) => (
+              <View key={f.key} style={{ marginBottom: 30 }}>
+                <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600', marginBottom: 10 }}>{f.label}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 15, lineHeight: 22 }}>
+                  {selectedReview.answers[f.key] || 'No reflection provided.'}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -485,9 +560,9 @@ const ds = StyleSheet.create({
   },
   gaugeContainer: { height: 165, alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%', marginTop: 15 },
   ticksWrapper: { position: 'absolute', width: 270, height: 270, alignItems: 'center', justifyContent: 'center', top: -35 },
-  tickLine: { position: 'absolute', width: 1.5, borderRadius: 1 }, 
+  tickLine: { position: 'absolute', width: 1.5, borderRadius: 1 },
   scoreOverlay: { alignItems: 'center', justifyContent: 'center', top: 5 },
-  hugeScore: { color: '#ffffff', fontSize: 79, fontWeight: '500', letterSpacing: -1, lineHeight: 74, marginBottom: 0 }, 
+  hugeScore: { color: '#ffffff', fontSize: 79, fontWeight: '500', letterSpacing: -1, lineHeight: 79, marginBottom: 0 },
   inRangeTag: { color: 'rgba(255, 255, 255, 0.5)', fontSize: 12, marginTop: -2, marginBottom: 2 },
   scoreLabel: { color: 'rgba(255, 255, 255, 0.4)', fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textAlign: 'center', marginTop: 4 },
   dateSubText: { color: 'rgba(255, 255, 255, 0.3)', fontSize: 11, marginTop: 2 },
@@ -546,8 +621,8 @@ const s = StyleSheet.create({
 
 const tl = StyleSheet.create({
   rowItem: { flexDirection: 'row', minHeight: 60, marginBottom: 10 },
-  axisColumn: { width: 16, alignItems: 'center', justifyContent: 'center' },
-  lineSegment: { flex: 1, width: 1 },
-  cleanDotNode: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.6)' },
+  axisColumn: { width: 16, alignItems: 'center', position: 'relative' },
+  lineSegment: { position: 'absolute', top: 0, bottom: 0, width: 1 },
+  cleanDotNode: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.6)', marginTop: 8, zIndex: 2 },
   bodyCard: { flex: 1, paddingLeft: 20, paddingBottom: 10 },
 });

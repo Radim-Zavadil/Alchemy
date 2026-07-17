@@ -1,8 +1,7 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 
@@ -13,55 +12,48 @@ export default function GetStartedScreen() {
         <View style={styles.container}>
             <StatusBar style="light" />
 
-            {/* Background */}
-            <LinearGradient
-                colors={['#000000', '#000000']}
+            {/* Full-bleed background image */}
+            <ImageBackground
+                source={require('../../../assets/images/onboarding/getStarted.png')}
                 style={styles.background}
-            />
+                resizeMode="cover"
+            >
+                {/* Black overlay above the image */}
+                <View style={styles.overlay} />
 
-            <View style={styles.content}>
-                {/* Phone Image Section */}
-                <Animated.View
-                    style={styles.imageSection}
-                    entering={FadeInDown.delay(300).springify()}
-                >
-                    {/* Using a placeholder or the specific image if available. 
-                        If the user provided path is strict, we use it. 
-                        Safeguarding against missing image by just using the require 
-                        and assuming user put it there or I'll need to ask/fix.
-                    */}
-                    <Image
-                        source={require('../../../assets/images/onboarding/getStarted.png')}
-                        style={styles.phoneImage}
-                        resizeMode="contain"
-                    />
-                </Animated.View>
-
-                {/* Bottom Card Section */}
-                <Animated.View
-                    style={styles.bottomSection}
-                    entering={FadeInDown.delay(600).springify()}
-                >
-                    <Text style={styles.cardTitle}>Welcome to Alchemy</Text>
-                    <Text style={styles.cardText}>
-                        Starting today, let's focus better and accomplish your dreams.
-                    </Text>
-
-                    <TouchableOpacity
-                        style={styles.mainButton}
-                        onPress={() => router.push('/onboarding/name')}
+                <View style={styles.content}>
+                    {/* Centered title + subtitle */}
+                    <Animated.View
+                        style={styles.centerSection}
+                        entering={FadeIn.delay(300).duration(600)}
                     >
-                        <Text style={styles.mainButtonText}>Get Started</Text>
-                    </TouchableOpacity>
+                        <Text style={styles.title}>Meet your future self</Text>
+                        <Text style={styles.subtitle}>
+                            See where your current life is taking you—and learn how to change the outcome.
+                        </Text>
+                    </Animated.View>
 
-                    <TouchableOpacity
-                        style={styles.secondaryButton}
-                        onPress={() => router.push('/onboarding/auth-choice?mode=login')}
+                    {/* Bottom section */}
+                    <Animated.View
+                        style={styles.bottomSection}
+                        entering={FadeInDown.delay(500).springify()}
                     >
-                        <Text style={styles.secondaryButtonText}>Already have an account?</Text>
-                    </TouchableOpacity>
-                </Animated.View>
-            </View>
+                        <TouchableOpacity
+                            style={styles.mainButton}
+                            onPress={() => router.push('/onboarding/name')}
+                        >
+                            <Text style={styles.mainButtonText}>Get Started</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={() => router.push('/onboarding/auth-choice?mode=login')}
+                        >
+                            <Text style={styles.secondaryButtonText}>Already have an account</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+            </ImageBackground>
         </View>
     );
 }
@@ -72,48 +64,47 @@ const styles = StyleSheet.create({
         backgroundColor: '#000',
     },
     background: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
+        flex: 1,
+        width,
+        height,
+    },
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.55)',
     },
     content: {
         flex: 1,
         paddingHorizontal: 24,
         justifyContent: 'space-between',
-        paddingTop: height * 0.08,
+        paddingTop: height * 0.1,
         paddingBottom: 50,
     },
-    imageSection: {
+    centerSection: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        marginTop: 130
     },
-    phoneImage: {
-        width: width * 0.7,
-        height: height * 0.5,
+    title: {
+        fontSize: 43,
+        fontWeight: '400',
+        color: '#fff',
+        marginBottom: 11,
+        textAlign: 'center',
+        fontFamily: 'Inter',
+        lineHeight: 50,
+    },
+    subtitle: {
+        fontSize: 17,
+        fontWeight: '400',
+        color: 'rgba(255,255,255,0.6)',
+        textAlign: 'center',
+        lineHeight: 24,
+        paddingHorizontal: 12,
+        fontFamily: 'Inter',
     },
     bottomSection: {
         alignItems: 'center',
-        paddingBottom: 20,
-    },
-    cardTitle: {
-        fontSize: 29,
-        fontWeight: '600',
-        color: '#fff',
-        marginBottom: 12,
-        textAlign: 'center',
-        fontFamily: "Inter"
-    },
-    cardText: {
-        fontSize: 18,
-        color: '#bebebeff',
-        textAlign: 'center',
-        marginBottom: 32,
-        lineHeight: 24,
-        paddingHorizontal: 20,
-        fontFamily: "Inter"
     },
     mainButton: {
         backgroundColor: '#fff',
@@ -131,15 +122,16 @@ const styles = StyleSheet.create({
     mainButtonText: {
         color: '#000',
         fontSize: 18,
-        fontWeight: '700',
-        fontFamily: "Inter"
+        fontWeight: '400',
+        fontFamily: 'Inter',
     },
     secondaryButton: {
         paddingVertical: 12,
     },
     secondaryButtonText: {
         color: '#fff',
-        fontSize: 19,
-        fontFamily: "Inter"
+        fontSize: 16,
+        fontWeight: '400',
+        fontFamily: 'Inter',
     },
 });

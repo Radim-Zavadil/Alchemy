@@ -24,7 +24,7 @@ import Reanimated, {
 const { width, height } = Dimensions.get('window');
 const SETTINGS_KEY = 'home_settings_v3';
 const REVIEWS_KEY = 'alchemy_reviews';
-const DREAM_KEY = 'alchemy_user_dream';
+const DREAM_KEY = 'alchemy_user_dream_v3';
 
 const FONTS = [
   { id: 'system', name: 'System', family: Platform.OS === 'ios' ? 'System' : 'sans-serif', preview: 'Focus on your vision' },
@@ -95,7 +95,9 @@ export default function Home() {
   });
   const [activeModal, setActiveModal] = useState(null);
   const [curImgIdx, setCurImgIdx] = useState(0);
-  const [nextImgIdx, setNextImgIdx] = useState(null);
+
+  // Always-current index, used inside changeSlide to avoid stale-closure bugs
+  const curImgIdxRef = useRef(0);
 
   // Animation values for AirDrop sequence
   const topAnimY = useRef(new Animated.Value(-160)).current;
@@ -120,17 +122,50 @@ export default function Home() {
       if (u) {
         const { data: files } = await supabase.storage.from('user-images').list(u.id, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
         if (files?.length) {
-          setUserImages(files.filter(f => f.name && f.name !== '.emptyFolderPlaceholder' && !f.name.startsWith('.')).map(f => {
-            const { data: ud } = supabase.storage.from('user-images').getPublicUrl(`${u.id}/${f.name}`);
-            return { id: f.id || f.name, url: ud.publicUrl };
-          }));
-        } else setUserImages([]);
+          const imgs = files
+            .filter(f => f.name && f.name !== '.emptyFolderPlaceholder' && !f.name.startsWith('.'))
+            .map(f => {
+              const { data: ud } = supabase.storage.from('user-images').getPublicUrl(`${u.id}/${f.name}`);
+              return { id: f.id || f.name, url: ud.publicUrl };
+            });
+
+          setUserImages(imgs);
+
+          // Preload every image so swapping curImgIdx never shows a blank frame —
+          // by the time the fade-out finishes, the next image is already cached.
+          imgs.forEach(img => {
+            if (img.url) Image.prefetch(img.url).catch(() => { });
+          });
+        } else {
+          setUserImages([]);
+        }
+      } else {
+        setUserImages([]);
       }
-      const sd = await AsyncStorage.getItem(DREAM_KEY); if (sd) setDream(sd);
+      const sd = await AsyncStorage.getItem(DREAM_KEY);
+      if (sd) {
+        try {
+          const parsed = JSON.parse(sd);
+          setDream(parsed.q1 || parsed.description || '');
+        } catch (e) {
+          setDream(sd);
+        }
+      } else {
+        setDream('');
+      }
       const sr = await AsyncStorage.getItem(REVIEWS_KEY); if (sr) setReviews(JSON.parse(sr));
     } catch (e) { console.log('Home load error:', e); }
     finally { setLoading(false); }
   }, []);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        loadData();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [loadData]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -138,7 +173,7 @@ export default function Home() {
     if (!dream && reviews.length === 0) {
       return ["Open the Review tab, describe your dream, and write your first weekly log — the portal will begin to see."];
     }
-    
+
     const msgs = [];
     if (dream) {
       msgs.push(`Your dream is to "${dream}". Every action today is building that reality.`);
@@ -158,16 +193,16 @@ export default function Home() {
   }, [dream, reviews]);
 
   const contentOpacity = useRef(new Animated.Value(1)).current;
-  const nextContentOpacity = useRef(new Animated.Value(0)).current;
   const swipeLock = useRef(false);
 
   const changeSlide = useCallback((dir) => {
     if (swipeLock.current) return;
     swipeLock.current = true;
 
-    const maxLimit = userImages.length > 0 ? userImages.length : allMessages.length;
-    const targetIdx = (curImgIdx + dir + maxLimit) % maxLimit;
-    setNextImgIdx(targetIdx);
+    const maxLimit = Math.max(userImages.length, allMessages.length);
+    const targetIdx = maxLimit > 0
+      ? (curImgIdxRef.current + dir + maxLimit) % maxLimit
+      : 0;
 
     // Reset layout variables cleanly
     topAnimY.setValue(-160);
@@ -177,9 +212,8 @@ export default function Home() {
     bubbleAnimOpacity.setValue(0);
 
     Animated.parallel([
-      Animated.timing(contentOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
-      Animated.timing(nextContentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-      
+      Animated.timing(contentOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+
       // Top plate entry (Hugs top edge tightly, slightly out of screen)
       Animated.parallel([
         Animated.timing(topAnimY, { toValue: insets.top - 10, duration: 450, easing: Easing.out(Easing.back(0.8)), useNativeDriver: true }),
@@ -188,48 +222,49 @@ export default function Home() {
 
       // Bubble pop sequence rising towards top plate boundary
       Animated.parallel([
-        Animated.timing(bubbleAnimOpacity, { toValue: 0.3, duration: 500, useNativeDriver: true }), // Clean max animated opacity target
+        Animated.timing(bubbleAnimOpacity, { toValue: 0.3, duration: 500, useNativeDriver: true }),
         Animated.timing(bubbleAnimScale, { toValue: 1, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }),
         Animated.sequence([
           Animated.timing(bubbleAnimY, { toValue: height * 0.35, duration: 500, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-          // Anchored to top: 0, so we subtract native elements or style offsets cleanly
           Animated.timing(bubbleAnimY, { toValue: insets.top - 120, duration: 300, easing: Easing.bezier(0.4, 0, 0.6, 0.15), useNativeDriver: true })
         ])
       ])
     ]).start(() => {
       setCurImgIdx(targetIdx);
-      setNextImgIdx(null);
-      contentOpacity.setValue(1);
-      nextContentOpacity.setValue(0);
+      curImgIdxRef.current = targetIdx;
 
-      Animated.parallel([
-        Animated.timing(topAnimY, { toValue: -160, duration: 350, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-        Animated.timing(topAnimOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
-        Animated.timing(bubbleAnimScale, { toValue: 0.7, duration: 300, useNativeDriver: true }),
-        Animated.timing(bubbleAnimOpacity, { toValue: 0, duration: 250, useNativeDriver: true })
-      ]).start(() => {
-        swipeLock.current = false;
+      Animated.timing(contentOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start(() => {
+        Animated.parallel([
+          Animated.timing(topAnimY, { toValue: -160, duration: 350, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.timing(topAnimOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.timing(bubbleAnimScale, { toValue: 0.7, duration: 300, useNativeDriver: true }),
+          Animated.timing(bubbleAnimOpacity, { toValue: 0, duration: 250, useNativeDriver: true })
+        ]).start(() => {
+          swipeLock.current = false;
+        });
       });
     });
-  }, [curImgIdx, userImages.length, allMessages.length, insets.top]);
+  }, [userImages.length, allMessages.length, insets.top]);
+
+  // Keep a stable ref pointing at the latest changeSlide so the PanResponder
+  // (created once via useRef) never calls a stale closure.
+  const changeSlideRef = useRef(changeSlide);
+  useEffect(() => { changeSlideRef.current = changeSlide; }, [changeSlide]);
 
   const swipeResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (e, gs) => Math.abs(gs.dy) > 10,
     onPanResponderRelease: (e, gs) => {
       if (gs.dy < -60) {
-        changeSlide(1); 
+        changeSlideRef.current(1);
       } else if (gs.dy > 60) {
-        changeSlide(-1);
+        changeSlideRef.current(-1);
       }
     },
   })).current;
 
   const activeImageUrl = userImages.length > 0 ? userImages[curImgIdx % userImages.length]?.url : null;
-  const nextImageUrl = (userImages.length > 0 && nextImgIdx !== null) ? userImages[nextImgIdx % userImages.length]?.url : null;
-
   const currentQuote = allMessages[curImgIdx % allMessages.length] || '';
-  const nextQuote = nextImgIdx !== null ? (allMessages[nextImgIdx % allMessages.length] || '') : '';
   const fontObj = FONTS.find(f => f.id === settings.quoteFont) || FONTS[0];
 
   const panResponder = useRef(PanResponder.create({
@@ -254,15 +289,6 @@ export default function Home() {
         <Animated.Image
           source={{ uri: activeImageUrl }}
           style={[StyleSheet.absoluteFillObject, { opacity: contentOpacity }]}
-          resizeMode="cover"
-        />
-      )}
-
-      {/* NEXT IMAGE */}
-      {nextImageUrl && (
-        <Animated.Image
-          source={{ uri: nextImageUrl }}
-          style={[StyleSheet.absoluteFillObject, { opacity: nextContentOpacity }]}
           resizeMode="cover"
         />
       )}
@@ -302,16 +328,9 @@ export default function Home() {
         {loading ? (
           <ActivityIndicator size="large" color="#FFFFFF" />
         ) : (
-          <>
-            <Animated.Text style={[styles.quoteText, { color: settings.quoteColor, fontFamily: fontObj.family, opacity: contentOpacity, position: 'absolute' }]}>
-              {currentQuote}
-            </Animated.Text>
-            {nextImgIdx !== null && (
-              <Animated.Text style={[styles.quoteText, { color: settings.quoteColor, fontFamily: fontObj.family, opacity: nextContentOpacity, position: 'absolute' }]}>
-                {nextQuote}
-              </Animated.Text>
-            )}
-          </>
+          <Animated.Text style={[styles.quoteText, { color: settings.quoteColor, fontFamily: fontObj.family, opacity: contentOpacity }]}>
+            {currentQuote}
+          </Animated.Text>
         )}
       </View>
 
@@ -400,12 +419,12 @@ const styles = StyleSheet.create({
     left: (width - 1010) / 2,
     width: 1010,
     height: 500,
-    marginTop: -65, 
+    marginTop: -65,
     zIndex: 99,
   },
   airdropBubble: {
     position: 'absolute',
-    top: 0,                    // Anchored at the top boundary layout instead of bottom-hanging
+    top: 0,
     left: (width - 620) / 2,
     width: 620,
     height: 620,
